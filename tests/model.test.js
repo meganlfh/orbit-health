@@ -1,0 +1,14 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {assess,validateRecord,parseImport,demoRecords,csv} from '../src/model.js';
+const now=new Date('2026-11-12T12:00:00Z');
+const valid=()=>({...demoRecords(now)[0],date:now.toISOString()});
+test('empty state does not imply health',()=>assert.equal(assess(null,now).state,'empty'));
+test('concerning symptoms escalate even when every demo envelope is met',()=>{const r={...valid(),heartRate:65,systolic:115,temperature:36.6,glucose:95,sleep:8,mood:4,symptoms:true};assert.equal(assess(r,now).state,'urgent');assert.equal(assess(r,now).flags.length,0);});
+test('stale record identified independently of range flags',()=>{const r={...valid(),date:'2026-11-10T00:00:00Z'};assert.equal(assess(r,now).stale,true);});
+test('envelope boundaries are inclusive and flags explain observed values',()=>{let r={...valid(),sleep:7};assert.ok(!assess(r,now).flags.some(f=>f.key==='sleep'));r.sleep=6.9;assert.match(assess(r,now).flags.find(f=>f.key==='sleep').message,/6.9/);});
+test('reject invalid numbers, missing fields, fractional mood, future and invalid times',()=>{for(const patch of [{heartRate:NaN},{sleep:-1},{mood:2.5},{systolic:undefined},{date:'2027-01-01'},{date:'invalid'},{glucose:'90'},{notes:'x'.repeat(501)},{symptoms:'false'}])assert.throws(()=>validateRecord({...valid(),...patch},now));});
+test('import validates atomically, limits size, rejects duplicates and sorts',()=>{const rows=demoRecords(now);assert.deepEqual(parseImport({version:1,records:[...rows].reverse()},now),rows);assert.throws(()=>parseImport({version:2,records:rows},now));assert.throws(()=>parseImport({version:1,records:[valid(),valid()]},now));assert.throws(()=>parseImport({version:1,records:Array(501).fill(valid())},now));assert.throws(()=>parseImport({version:1,records:[valid(),{...valid(),mood:0}]},now));});
+test('CSV escapes quotes, commas, line breaks and spreadsheet formulas',()=>{const output=csv([{...valid(),notes:' =HYPERLINK("bad")\ncomma,'}]);assert.ok(output.includes('"\' =HYPERLINK(""bad"")\ncomma,"'));});
+test('unknown imported properties are discarded',()=>{const r=validateRecord({...valid(),injected:'<script>'},now);assert.equal(r.injected,undefined);});
+test('synthetic demo round trips through export/import validation',()=>assert.equal(parseImport(JSON.parse(JSON.stringify({version:1,records:demoRecords(now)})),now).length,14));

@@ -1,0 +1,1 @@
+{"name":"Orbit Health","short_name":"Orbit","description":"Record health measurements and review recent readings","start_url":"./","scope":"./","display":"standalone","background_color":"#0b131c","theme_color":"#0b131c","icons":[{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any"}]}
