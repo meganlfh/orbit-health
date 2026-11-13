@@ -4,7 +4,7 @@
 
 Run `npm test` and `npm run check` with Node.js 20+.
 
-Nine Node unit tests cover empty state, symptom-first escalation, stale records, inclusive demo-envelope boundaries, invalid input and future timestamps, atomic import validation, schema/version/size/duplicate rejection, CSV formula neutralization and quoting, unknown property removal, and demo round-trip validation.
+Twelve Node unit tests cover empty state, symptom-first escalation and action priority, stale-record follow-up, per-indicator action guidance, inclusive demo-envelope boundaries, invalid input and future timestamps, atomic import validation, schema/version/size/duplicate rejection, CSV formula neutralization and quoting, unknown property removal, and demo round-trip validation.
 
 `npm run check` parses the application and service worker. GitHub Actions runs both commands on pushes and pull requests. The app has no third-party runtime dependencies.
 

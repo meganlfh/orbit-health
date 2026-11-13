@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {assess,validateRecord,parseImport,demoRecords,csv} from '../src/model.js';
+import {actionGuidance} from '../src/actions.js';
 const now=new Date('2026-11-12T12:00:00Z');
 const valid=()=>({...demoRecords(now)[0],date:now.toISOString()});
 test('empty state does not imply health',()=>assert.equal(assess(null,now).state,'empty'));
@@ -12,3 +13,6 @@ test('import validates atomically, limits size, rejects duplicates and sorts',()
 test('CSV escapes quotes, commas, line breaks and spreadsheet formulas',()=>{const output=csv([{...valid(),notes:' =HYPERLINK("bad")\ncomma,'}]);assert.ok(output.includes('"\' =HYPERLINK(""bad"")\ncomma,"'));});
 test('unknown imported properties are discarded',()=>{const r=validateRecord({...valid(),injected:'<script>'},now);assert.equal(r.injected,undefined);});
 test('synthetic demo round trips through export/import validation',()=>assert.equal(parseImport(JSON.parse(JSON.stringify({version:1,records:demoRecords(now)})),now).length,14));
+test('flagged indicators include measurement, context, procedure, and trend guidance',()=>{const actions=actionGuidance({...valid(),heartRate:100,glucose:200},now).filter(a=>a.type==='flag');assert.deepEqual(actions.map(a=>a.key),['heartRate','glucose']);for(const action of actions){assert.match(action.check,/confirm|Review/);assert.match(action.context,/Record/);assert.match(action.followUp,/mission medical procedures/);assert.equal(action.trend,true);}});
+test('reported symptoms are prioritized before stale and flagged guidance',()=>{const actions=actionGuidance({...valid(),date:'2026-11-10T00:00:00Z',sleep:5,symptoms:true},now);assert.deepEqual(actions.map(a=>a.type),['symptoms','stale','flag']);assert.match(actions[0].detail,/take priority|procedure now/);});
+test('records older than 24 hours request a fresh check-in',()=>{const actions=actionGuidance({...valid(),date:'2026-11-11T11:59:59Z'},now);assert.equal(actions[0].type,'stale');assert.match(actions[0].detail,/Record a new check-in/);assert.equal(actions[0].followUp,true);});

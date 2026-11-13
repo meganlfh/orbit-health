@@ -8,6 +8,7 @@ Long missions can make regular health monitoring and communication more difficul
 
 - **Daily check-ins:** record resting heart rate, systolic pressure, body temperature, glucose, sleep duration, mood, symptoms, and notes.
 - **Health overview:** see the latest measurements, time of entry, and clearly explained sample-range flags. Entries older than 24 hours are marked as stale.
+- **Actions to take:** review how to check a flagged measurement and its units, record useful context, and follow established mission medical procedures. Symptom reports take priority, and stale records request a fresh check-in.
 - **Trend charts:** switch between indicators and inspect the latest 14 readings, with exact values available in a table.
 - **Body-system explorer:** read background information on cardiovascular health, sleep and mood, immune health, nutrition, and bone and muscle health.
 - **Daily routine:** track completion of a personal checklist that resets each local calendar day.
@@ -39,8 +40,9 @@ npm run dev -- --port 8080
 1. Enter a measurement time and the six health indicators.
 2. Add relevant context and indicate whether there are concerning symptoms.
 3. Save the check-in to update the overview and charts.
-4. Review changes over time and the associated body-system information.
-5. Export the records when a backup or transfer is needed.
+4. Review non-diagnostic follow-up guidance for any fictional sample-range flags, then open the relevant trend or record a follow-up check-in.
+5. Review changes over time and the associated body-system information.
+6. Export the records when a backup or transfer is needed.
 
 Values are entered manually. The app does not connect to wearables, sensors, or a medical service. The symptoms flag displays a reminder to follow the established mission medical protocol; it does not send an alert.
 
@@ -53,6 +55,7 @@ The interface uses HTML, CSS, and JavaScript modules. Charts are rendered with S
 | `index.html` | Dashboard structure and check-in form |
 | `styles.css` | Responsive layout and interface styling |
 | `src/app.js` | Rendering, charts, checklist, and record management |
+| `src/actions.js` | Prioritized, non-diagnostic action guidance for symptoms, stale records, and fictional sample-range flags |
 | `src/model.js` | Validation, sample data, range checks, and CSV export |
 | `sw.js` | Offline application cache |
 | `scripts/serve.mjs` | Local development server |
@@ -67,7 +70,7 @@ npm run check
 npm test
 ```
 
-The tests cover input validation, symptom flag handling, stale records, range boundaries, import validation, duplicate timestamps, CSV escaping, and sample-data round trips. GitHub Actions runs the checks on pushes and pull requests.
+The tests cover input validation, symptom priority, stale-record follow-up, per-indicator action guidance, range boundaries, import validation, duplicate timestamps, CSV escaping, and sample-data round trips. GitHub Actions runs the checks on pushes and pull requests.
 
 ## Data and privacy
 

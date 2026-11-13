@@ -1,4 +1,5 @@
 import {METRICS, ROUTINES, validateRecord, parseImport, assess, demoRecords, csv} from './model.js';
+import {actionGuidance} from './actions.js';
 const $ = s => document.querySelector(s);
 const KEY = 'orbit-health-v1', ROUTINE_KEY = 'orbit-routine-v1';
 let records = [], storageAvailable = true, checked = [];
@@ -45,6 +46,15 @@ function renderChart(){
   const points=values.map((v,i)=>`${x(i)},${y(v)}`).join(' ');
   $('#chart').innerHTML=`<svg viewBox="0 0 540 205" role="img" aria-label="${metric.label} across ${rows.length} check-ins. Exact values are in the table below."><title>${metric.label} (${metric.unit})</title>${[min,(min+max)/2,max].map(v=>`<line class="grid" x1="48" x2="516" y1="${y(v)}" y2="${y(v)}"/><text x="3" y="${y(v)+4}">${v.toFixed(1)}</text>`).join('')}<polyline class="line" points="${points}"/>${values.map((v,i)=>`<circle class="point" cx="${x(i)}" cy="${y(v)}" r="3"><title>${escape(displayDate(rows[i].date))}: ${v} ${metric.unit}</title></circle>`).join('')}<text x="48" y="193">${escape(displayDate(rows[0].date))}</text><text x="516" y="193" text-anchor="end">${rows.length>1?escape(displayDate(rows.at(-1).date)):''}</text></svg>`;
 }
+function renderActions(latest){
+  const actions=actionGuidance(latest);
+  $('#action-guidance').innerHTML=actions.length?actions.map(action=>{
+    const priority=action.type==='symptoms'?' priority':'';
+    const body=action.type==='flag'?`<ol><li><b>Check the measurement and units.</b> ${action.check}</li><li><b>Record context.</b> ${action.context}</li><li><b>Follow up.</b> ${action.followUp}</li></ol>`:`<p>${action.detail}</p>`;
+    const buttons=`<div class="action-buttons">${action.trend?`<button type="button" data-trend="${action.key}">View ${METRICS[action.key].label} trend</button>`:''}${action.followUp?`<button type="button" data-follow-up="${action.type}">${action.type==='stale'?'Record fresh check-in':'Record a follow-up'}</button>`:''}</div>`;
+    return `<article class="action-card${priority}"><h3>${action.title}</h3>${body}${buttons}</article>`;
+  }).join(''):'<p class="empty-state">No follow-up actions from the latest check-in. Fictional sample ranges do not establish health or rule out illness.</p>';
+}
 function render(){
   const latest=records.at(-1), result=assess(latest);
   $('#latest-time').textContent=latest?'Last entry · '+displayDate(latest.date):'No check-ins yet';
@@ -54,9 +64,16 @@ function render(){
   $('#record-count').textContent=`${records.length} CHECK-INS`;
   $('#history').innerHTML=records.length?table(records.slice(-30).reverse(),Object.keys(METRICS))+'<p class="muted">Showing latest 30 records. Exports include all records and notes.</p>':'<p class="empty-state">No check-ins saved yet.</p>';
   $('#export-json').disabled=$('#export-csv').disabled=!records.length;
+  renderActions(latest);
   renderChart();
 }
 $('#chart-metric').addEventListener('change',renderChart);
+$('#action-guidance').addEventListener('click',e=>{
+  const trend=e.target.closest('[data-trend]');
+  if(trend){$('#chart-metric').value=trend.dataset.trend;renderChart();$('#trends').scrollIntoView({behavior:'smooth'});$('#chart-metric').focus();return;}
+  const followUp=e.target.closest('[data-follow-up]');
+  if(followUp){$('#measurement-time').value=localInputTime();$('#checkin').scrollIntoView({behavior:'smooth'});(followUp.dataset.followUp==='symptoms'?$('#checkin-form [name="symptoms"]'):$('#measurement-time')).focus();}
+});
 $('#checkin-form').addEventListener('submit',e=>{
   e.preventDefault(); const data=new FormData(e.target);
   try{
