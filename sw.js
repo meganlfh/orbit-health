@@ -1,4 +1,4 @@
-const CACHE='orbit-health-v5';
+const CACHE='orbit-health-v6';
 const FILES=['./','./index.html','./styles.css','./actions.css','./src/app.js','./src/actions.js','./src/model.js','./icon.svg','./manifest.webmanifest'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES))));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith('orbit-health-')&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));

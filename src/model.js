@@ -5,8 +5,8 @@ export const METRICS = {
   temperature: { label: 'Body temperature', unit: '°C', min: 20, max: 45, step: 0.1, envelope: [36.2, 37.5], system: 'immune' },
   glucose: { label: 'Blood glucose', unit: 'mg/dL', min: 1, max: 1000, step: 1, envelope: [75, 140], system: 'nutrition' },
   sleep: { label: 'Sleep in last 24 hours', unit: 'hours', min: 0, max: 24, step: 0.1, envelope: [7, 9], system: 'mind' },
-  oxygenSaturation: { label: 'Oxygen saturation (SpO₂)', unit: '%', min: 0, max: 100, step: 0.1, system: 'respiratory' },
-  radiationExposure: { label: 'Radiation exposure', unit: 'mSv', min: 0, max: 100000, step: 0.001, system: 'radiation' }
+  oxygenSaturation: { label: 'Oxygen saturation (SpO₂)', unit: '%', min: 0, max: 100, step: 0.1, envelope: [95, 100], system: 'respiratory' },
+  radiationExposure: { label: 'Cumulative radiation exposure', unit: 'mSv', min: 0, max: 100000, step: 0.001, envelope: [0, 600], system: 'radiation' }
 };
 export const ROUTINES = ['Record daily check-in', 'Review assigned exercise plan', 'Review food and fluid log', 'Complete private wellbeing reflection'];
 export function validateRecord(input, now = new Date()) {

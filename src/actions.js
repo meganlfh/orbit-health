@@ -49,6 +49,8 @@ export function actionGuidance(record, now = new Date()) {
   }
 
   for (const flag of result.flags) {
+    // New measurements can be flagged before follow-up guidance is authored.
+    if (!GUIDANCE[flag.key]) continue;
     actions.push({
       type: 'flag',
       key: flag.key,
