@@ -85,11 +85,13 @@ function renderChart(){
   $('#chart').innerHTML=`<svg viewBox="0 0 540 205" role="img" aria-label="${metric.label} across ${rows.length} check-ins.${unhealthyCount?` ${unhealthyCount} unhealthy ${unhealthyCount===1?'reading':'readings'}.`:''} Exact values are in the table below."><title>${metric.label} (${metric.unit})</title>${[min,(min+max)/2,max].map(v=>`<line class="grid" x1="48" x2="516" y1="${y(v)}" y2="${y(v)}"/><text x="3" y="${y(v)+4}">${v.toFixed(1)}</text>`).join('')}${segments}${values.map((v,i)=>`<circle class="point${unhealthy[i]?' alert':''}" cx="${x(i)}" cy="${y(v)}" r="3"><title>${escape(displayDate(rows[i].date))}: ${v} ${metric.unit}${unhealthy[i]?' — unhealthy range':''}</title></circle>`).join('')}<text x="48" y="193">${escape(displayDate(rows[0].date))}</text><text x="516" y="193" text-anchor="end">${rows.length>1?escape(displayDate(rows.at(-1).date)):''}</text></svg>`;
 }
 function renderActions(latest){
-  const actions=actionGuidance(latest);
+  const immediate=actionGuidance(latest).filter(action=>action.type!=='flag').map(action=>({...action,sourceId:latest?.id}));
+  const indicatorActions=Object.keys(METRICS).flatMap(key=>{const source=latestMeasurement(key);if(!source)return[];const action=actionGuidance(source).find(item=>item.type==='flag'&&item.key===key);return action?[{...action,sourceId:source.id}]:[];});
+  const actions=[...immediate,...indicatorActions];
   $('#action-guidance').innerHTML=actions.length?actions.map(action=>{
     const priority=action.type==='symptoms'?' priority':'';
     const body=action.type==='flag'?`<ol class="action-sequence"><li><b>Recheck.</b> ${action.recheck}</li><li><b>Take action.</b> ${action.takeAction}</li><li><b>Seek help.</b> ${action.seekHelp}</li></ol><p class="action-space-tip"><b>ⓘ Space tip</b><br>${action.spaceTip}</p>`:`<p>${action.detail}</p>`;
-    const buttons=`<div class="action-buttons">${action.trend?`<button type="button" data-trend="${action.key}">View ${METRICS[action.key].label} trend</button>`:''}${action.followUp?`<button type="button" data-follow-up="${action.type}" data-follow-up-key="${action.key||''}" data-source-id="${latest.id}">${action.type==='stale'?'Record fresh check-in':'Record a follow-up'}</button>`:''}</div>`;
+    const buttons=`<div class="action-buttons">${action.trend?`<button type="button" data-trend="${action.key}">View ${METRICS[action.key].label} trend</button>`:''}${action.followUp?`<button type="button" data-follow-up="${action.type}" data-follow-up-key="${action.key||''}" data-source-id="${action.sourceId}">${action.type==='stale'?'Record fresh check-in':'Record a follow-up'}</button>`:''}</div>`;
     return `<article class="action-card${priority}"><h3>${action.title}</h3>${body}${buttons}</article>`;
   }).join(''):'<p class="empty-state">No follow-up actions from the latest check-in. Fictional sample ranges do not establish health or rule out illness.</p>';
 }
