@@ -1,0 +1,54 @@
+.metric-input {
+  min-width: 0;
+}
+
+.measurement-guide {
+  margin-top: 8px;
+  border: 1px solid #2d4657;
+  border-radius: 6px;
+  background: #0d1a25;
+}
+
+.measurement-guide summary {
+  padding: 8px 10px;
+  color: var(--mint);
+  font-weight: 600;
+}
+
+.measurement-guide[open] summary {
+  border-bottom: 1px solid #2d4657;
+}
+
+.guide-content {
+  padding: 10px 12px 12px;
+  color: #bac9d5;
+  font-size: 11px;
+}
+
+.guide-content p {
+  margin: 0 0 10px;
+}
+
+.guide-content ol {
+  margin: 5px 0 12px;
+  padding-left: 20px;
+}
+
+.guide-content li + li {
+  margin-top: 5px;
+}
+
+.guide-content .space-tip {
+  margin-bottom: 0;
+  padding: 8px 10px;
+  border-left: 2px solid var(--mint);
+  background: #132a28;
+}
+
+.chart .line.alert {
+  stroke: var(--red);
+}
+
+.chart .point.alert {
+  fill: var(--red);
+}

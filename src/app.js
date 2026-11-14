@@ -1,4 +1,4 @@
-import {METRICS, ROUTINES, validateRecord, parseImport, assess, demoRecords, csv} from './model.js';
+import {METRICS, MEASUREMENT_GUIDES, ROUTINES, validateRecord, parseImport, assess, hasUnusualTrend, demoRecords, csv} from './model.js';
 import {actionGuidance} from './actions.js';
 const $ = s => document.querySelector(s);
 const KEY = 'orbit-health-v1', ROUTINE_KEY = 'orbit-routine-v1';
@@ -20,7 +20,8 @@ function persist(next) {
 }
 function updateConnection(){ $('#connection').textContent = !storageAvailable ? 'Storage unavailable' : navigator.onLine ? 'Local storage · online' : 'Local storage · offline'; }
 for (const [key,m] of Object.entries(METRICS)) {
-  $('#metric-fields').insertAdjacentHTML('beforeend',`<label>${m.label} (${m.unit})<input type="number" name="${key}" min="${m.min}" max="${m.max}" step="${m.step}" required inputmode="decimal"></label>`);
+  const guide=MEASUREMENT_GUIDES[key];
+  $('#metric-fields').insertAdjacentHTML('beforeend',`<div class="metric-input"><label>${m.label} (${m.unit})<input type="number" name="${key}" min="${m.min}" max="${m.max}" step="${m.step}" required inputmode="decimal"></label><details class="measurement-guide"><summary>How to measure</summary><div class="guide-content"><p>${escape(guide.intro)}</p><p><b>Equipment</b><br>${escape(guide.equipment)}</p><b>How to measure</b><ol>${guide.steps.map(step=>`<li>${escape(step)}</li>`).join('')}</ol><p class="space-tip"><b>ⓘ Space tip</b><br>${escape(guide.spaceTip)}</p></div></details></div>`);
   $('#chart-metric').insertAdjacentHTML('beforeend',`<option value="${key}">${m.label}</option>`);
 }
 $('#chart-metric').value='sleep'; $('#measurement-time').value=localInputTime();
@@ -38,13 +39,14 @@ $('#routines').addEventListener('change',e=>{
 function table(rows, keys){return `<table><thead><tr><th>Time (local)</th>${keys.map(k=>`<th>${METRICS[k].label} (${METRICS[k].unit})</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr><td>${escape(displayDate(r.date))}</td>${keys.map(k=>`<td>${r[k]}</td>`).join('')}</tr>`).join('')}</tbody></table>`;}
 function renderChart(){
   const key=$('#chart-metric').value, metric=METRICS[key], rows=records.slice(-14);
+  const unusual=hasUnusualTrend(rows,key);
   $('#chart-table').innerHTML=rows.length?table(rows,[key]):'No values yet.';
-  $('#chart-caption').textContent=rows.length?`${rows.length} check-ins · ${metric.unit}`:'No measurements';
+  $('#chart-caption').textContent=rows.length?`${rows.length} check-ins · ${metric.unit}${unusual?' · unusual change detected':''}`:'No measurements';
   if(!rows.length){$('#chart').innerHTML='<p class="empty-state">Your trend starts with one check-in.<br>Or load the fictional 14-day demo below.</p>';return;}
   const values=rows.map(r=>r[key]), lo=Math.min(...values), hi=Math.max(...values), pad=Math.max((hi-lo)*.3,metric.step), min=lo-pad,max=hi+pad;
   const x=i=>48+(rows.length===1?234:i/(rows.length-1)*468), y=v=>162-(v-min)/(max-min)*132;
   const points=values.map((v,i)=>`${x(i)},${y(v)}`).join(' ');
-  $('#chart').innerHTML=`<svg viewBox="0 0 540 205" role="img" aria-label="${metric.label} across ${rows.length} check-ins. Exact values are in the table below."><title>${metric.label} (${metric.unit})</title>${[min,(min+max)/2,max].map(v=>`<line class="grid" x1="48" x2="516" y1="${y(v)}" y2="${y(v)}"/><text x="3" y="${y(v)+4}">${v.toFixed(1)}</text>`).join('')}<polyline class="line" points="${points}"/>${values.map((v,i)=>`<circle class="point" cx="${x(i)}" cy="${y(v)}" r="3"><title>${escape(displayDate(rows[i].date))}: ${v} ${metric.unit}</title></circle>`).join('')}<text x="48" y="193">${escape(displayDate(rows[0].date))}</text><text x="516" y="193" text-anchor="end">${rows.length>1?escape(displayDate(rows.at(-1).date)):''}</text></svg>`;
+  $('#chart').innerHTML=`<svg viewBox="0 0 540 205" role="img" aria-label="${metric.label} across ${rows.length} check-ins.${unusual?' Unusual change detected.':''} Exact values are in the table below."><title>${metric.label} (${metric.unit})</title>${[min,(min+max)/2,max].map(v=>`<line class="grid" x1="48" x2="516" y1="${y(v)}" y2="${y(v)}"/><text x="3" y="${y(v)+4}">${v.toFixed(1)}</text>`).join('')}<polyline class="line${unusual?' alert':''}" points="${points}"/>${values.map((v,i)=>`<circle class="point${unusual?' alert':''}" cx="${x(i)}" cy="${y(v)}" r="3"><title>${escape(displayDate(rows[i].date))}: ${v} ${metric.unit}</title></circle>`).join('')}<text x="48" y="193">${escape(displayDate(rows[0].date))}</text><text x="516" y="193" text-anchor="end">${rows.length>1?escape(displayDate(rows.at(-1).date)):''}</text></svg>`;
 }
 function renderActions(latest){
   const actions=actionGuidance(latest);

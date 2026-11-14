@@ -10,6 +10,7 @@ Long missions can make regular health monitoring and communication more difficul
 - **Health overview:** see the latest measurements, time of entry, and clearly explained sample-range flags. Entries older than 24 hours are marked as stale.
 - **Actions to take:** review how to check a flagged measurement and its units, record useful context, and follow established mission medical procedures. Symptom reports take priority, and stale records request a fresh check-in.
 - **Trend charts:** switch between indicators and inspect the latest 14 readings, with exact values available in a table.
+- **Measurement guides:** expand equipment, measurement steps, and a space-specific tip beneath every check-in indicator.
 - **Body-system explorer:** read background information on cardiovascular health, sleep, immune health, nutrition, and bone and muscle health.
 - **Daily routine:** track completion of a personal checklist that resets each local calendar day.
 - **Local records:** save check-ins in the browser and export them as JSON or CSV. Restore records from a validated JSON export.
@@ -71,6 +72,8 @@ npm test
 ```
 
 The tests cover input validation, symptom priority, stale-record follow-up, per-indicator action guidance, range boundaries, import validation, duplicate timestamps, CSV escaping, and sample-data round trips. GitHub Actions runs the checks on pushes and pull requests.
+
+Trend lines turn red when a reading is outside its demo envelope or when consecutive readings meet the indicator-specific sudden-change threshold. The chart caption also reports the unusual change so the warning does not rely on color alone.
 
 ## Data and privacy
 
