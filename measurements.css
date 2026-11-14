@@ -2,6 +2,37 @@
   min-width: 0;
 }
 
+.previous-reading {
+  display: block;
+  margin-top: 6px;
+  color: var(--mint);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.previous-reading[hidden] {
+  display: none;
+}
+
+.metric-input.optional-follow-up > label::after {
+  content: "Optional in this follow-up";
+  display: inline-block;
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.metric-time {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.not-measured {
+  color: var(--muted);
+  font-style: italic;
+}
+
 .follow-up-context {
   display: flex;
   align-items: center;

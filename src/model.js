@@ -61,9 +61,15 @@ export function validateRecord(input, now = new Date()) {
   if (typeof input.date !== 'string' || !Number.isFinite(+date) || +date > +now + 60000) throw new Error('Choose a valid date and time that is not in the future.');
   const id = input.id ?? derivedRecordId(date);
   if (typeof id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(id)) throw new Error('Record ID is invalid.');
-  const record = {id, date: date.toISOString()};
+  const recordType = input.recordType ?? 'full';
+  if (!['full','follow-up'].includes(recordType)) throw new Error('Record type is invalid.');
+  const record = {id, date: date.toISOString(), recordType};
   for (const [key, metric] of Object.entries(METRICS)) {
     const value = input[key];
+    if (value == null) {
+      if (recordType === 'full') throw new Error(`${metric.label}: enter a measurement.`);
+      continue;
+    }
     if (typeof value !== 'number' || !Number.isFinite(value) || value < metric.min || value > metric.max || (metric.step === 1 && !Number.isInteger(value))) throw new Error(`${metric.label}: enter a valid value from ${metric.min} to ${metric.max}.`);
     record[key] = value;
   }
@@ -78,6 +84,7 @@ export function validateRecord(input, now = new Date()) {
     if (!FOLLOW_UP_REASONS.has(input.followUpReason)) throw new Error('Follow-up reason is invalid.');
     if (input.followUpReason === 'unhealthy-range' && !input.followUpIndicator) throw new Error('Indicator follow-ups must identify an indicator.');
     if (input.followUpReason !== 'unhealthy-range' && input.followUpIndicator != null) throw new Error('Only unhealthy-range follow-ups can identify an indicator.');
+    if (recordType === 'follow-up' && input.followUpIndicator && !Number.isFinite(record[input.followUpIndicator])) throw new Error('Measure the selected follow-up indicator.');
     record.followUpTo = input.followUpTo;
     record.followUpIndicator = input.followUpIndicator ?? null;
     record.followUpReason = input.followUpReason;
@@ -85,7 +92,7 @@ export function validateRecord(input, now = new Date()) {
   return record;
 }
 export function parseImport(data, now = new Date()) {
-  if (![1,2].includes(data?.version) || !Array.isArray(data.records) || data.records.length > 500) throw new Error('Expected an Orbit Health version 1 or 2 export with at most 500 check-ins.');
+  if (![1,2,3].includes(data?.version) || !Array.isArray(data.records) || data.records.length > 500) throw new Error('Expected an Orbit Health version 1, 2, or 3 export with at most 500 check-ins.');
   const records = data.records.map(r => validateRecord(r, now));
   if (new Set(records.map(r => r.date)).size !== records.length) throw new Error('Duplicate check-in timestamps in file.');
   if (new Set(records.map(r => r.id)).size !== records.length) throw new Error('Duplicate record IDs in file.');
@@ -100,9 +107,9 @@ export function parseImport(data, now = new Date()) {
 }
 export function assess(record, now = new Date()) {
   if (!record) return {state:'empty', title:'Awaiting your first check-in', flags:[], stale:false};
-  const flags = Object.entries(METRICS).filter(([key, m]) => m.envelope && (record[key] < m.envelope[0] || record[key] > m.envelope[1])).map(([key,m]) => ({key, label:m.label, message:`${record[key]} ${m.unit} is outside the fictional demo envelope (${m.envelope.join('–')} ${m.unit}).`}));
+  const flags = Object.entries(METRICS).filter(([key, m]) => Number.isFinite(record[key]) && (record[key] < m.envelope[0] || record[key] > m.envelope[1])).map(([key,m]) => ({key, label:m.label, message:`${record[key]} ${m.unit} is outside the fictional demo envelope (${m.envelope.join('–')} ${m.unit}).`}));
   const stale = +now - +new Date(record.date) > 24 * 3600000;
-  return {state:record.symptoms ? 'urgent' : flags.length ? 'review' : 'logged', title:record.symptoms ? 'Follow the mission medical protocol' : flags.length ? `${flags.length} demo range ${flags.length === 1 ? 'flag' : 'flags'} to review` : 'Check-in recorded', flags, stale};
+  return {state:record.symptoms ? 'urgent' : flags.length ? 'review' : 'logged', title:record.symptoms ? 'Follow the mission medical protocol' : flags.length ? `${flags.length} demo range ${flags.length === 1 ? 'flag' : 'flags'} to review` : record.recordType==='follow-up'?'Follow-up recorded':'Check-in recorded', flags, stale};
 }
 export function unhealthyTrendPoints(records, key) {
   const metric = METRICS[key];
@@ -111,10 +118,10 @@ export function unhealthyTrendPoints(records, key) {
   return values.map(value => Number.isFinite(value) && (value < metric.envelope[0] || value > metric.envelope[1]));
 }
 export function demoRecords(now = new Date()) {
-  return Array.from({length:14}, (_,i) => ({id:`demo-${String(i+1).padStart(2,'0')}`,date:new Date(+now - (13-i)*86400000).toISOString(),heartRate:[66,68,65,70,67,69,72,68,71,74,72,76,78,82][i],systolic:115 + i % 6,temperature:Number((36.6 + (i % 3)/10).toFixed(1)),glucose:92 + i%9,sleep:[8,7.7,8.2,7.5,7.8,7.4,7.6,7.2,7.1,7.5,7,6.8,6.5,6.2][i],oxygenSaturation:Number((98 - (i % 4)/10).toFixed(1)),radiationExposure:Number((0.08 + i * 0.004).toFixed(3)),symptoms:false,notes:i===13?'Synthetic example: interrupted sleep after a busy mission day.':'Synthetic demo record.'}));
+  return Array.from({length:14}, (_,i) => ({id:`demo-${String(i+1).padStart(2,'0')}`,date:new Date(+now - (13-i)*86400000).toISOString(),recordType:'full',heartRate:[66,68,65,70,67,69,72,68,71,74,72,76,78,82][i],systolic:115 + i % 6,temperature:Number((36.6 + (i % 3)/10).toFixed(1)),glucose:92 + i%9,sleep:[8,7.7,8.2,7.5,7.8,7.4,7.6,7.2,7.1,7.5,7,6.8,6.5,6.2][i],oxygenSaturation:Number((98 - (i % 4)/10).toFixed(1)),radiationExposure:Number((0.08 + i * 0.004).toFixed(3)),symptoms:false,notes:i===13?'Synthetic example: interrupted sleep after a busy mission day.':'Synthetic demo record.'}));
 }
 export function csv(records) {
-  const keys = ['id','date',...Object.keys(METRICS),'symptoms','notes','followUpTo','followUpIndicator','followUpReason'];
+  const keys = ['id','date','recordType',...Object.keys(METRICS),'symptoms','notes','followUpTo','followUpIndicator','followUpReason'];
   // Neutralize spreadsheet formulas even when a cell begins with whitespace.
   const cell = v => '"' + String(typeof v === 'string' && /^[\s]*[=+@\-]/.test(v) ? "'"+v : v).replaceAll('"','""') + '"';
   return [keys.join(','),...records.map(r => keys.map(k=>cell(r[k] ?? '')).join(','))].join('\r\n');

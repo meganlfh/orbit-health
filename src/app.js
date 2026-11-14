@@ -1,7 +1,7 @@
 import {METRICS, MEASUREMENT_GUIDES, ROUTINES, validateRecord, parseImport, assess, unhealthyTrendPoints, demoRecords, csv} from './model.js';
 import {actionGuidance} from './actions.js';
 const $ = s => document.querySelector(s);
-const KEY = 'orbit-health-v1', ROUTINE_KEY = 'orbit-routine-v1', DATA_VERSION = 2;
+const KEY = 'orbit-health-v1', ROUTINE_KEY = 'orbit-routine-v1', DATA_VERSION = 3;
 let records = [], storageAvailable = true, checked = [], pendingFollowUp = null;
 const escape = s => String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const createRecordId = () => globalThis.crypto?.randomUUID?.() || `record-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,10)}`;
@@ -20,21 +20,35 @@ function persist(next) {
   catch {storageAvailable=false; updateConnection(); $('#data-message').textContent='Could not save: browser storage is unavailable or full. Export your existing records.'; return false;}
 }
 function updateConnection(){ $('#connection').textContent = !storageAvailable ? 'Storage unavailable' : navigator.onLine ? 'Local storage · online' : 'Local storage · offline'; }
+function latestMeasurement(key,beforeDate=null){return [...records].reverse().find(record=>Number.isFinite(record[key])&&(!beforeDate||record.date<=beforeDate));}
+function configureMeasurementFields(){
+  const partial=Boolean(pendingFollowUp&&pendingFollowUp.followUpReason!=='stale'),source=partial?records.find(record=>record.id===pendingFollowUp.followUpTo):null;
+  for(const key of Object.keys(METRICS)){
+    const input=document.querySelector(`[name="${key}"]`),previous=document.querySelector(`[data-previous-for="${key}"]`),target=key===pendingFollowUp?.followUpIndicator;
+    input.required=!partial||target;
+    input.closest('.metric-input').classList.toggle('optional-follow-up',partial&&!target);
+    if(!partial||!source){previous.hidden=true;continue;}
+    const prior=latestMeasurement(key,source.date);
+    previous.textContent=prior?`Previous: ${prior[key]} ${METRICS[key].unit} · ${displayDate(prior.date)}${target?'':' · Optional to measure again'}`:'No previous measurement · Optional';
+    previous.hidden=false;
+  }
+}
 function renderFollowUpContext(){
   document.querySelectorAll('.metric-input.follow-up-target').forEach(field=>field.classList.remove('follow-up-target'));
-  if(!pendingFollowUp){$('#follow-up-context').hidden=true;return;}
+  if(!pendingFollowUp){$('#follow-up-context').hidden=true;configureMeasurementFields();return;}
   const source=records.find(record=>record.id===pendingFollowUp.followUpTo);
-  if(!source){pendingFollowUp=null;$('#follow-up-context').hidden=true;return;}
+  if(!source){pendingFollowUp=null;$('#follow-up-context').hidden=true;configureMeasurementFields();return;}
   let description=`Following up on the check-in recorded ${displayDate(source.date)}.`;
-  if(pendingFollowUp.followUpIndicator){const metric=METRICS[pendingFollowUp.followUpIndicator];description=`Following up on ${metric.label} recorded ${displayDate(source.date)}: ${source[pendingFollowUp.followUpIndicator]} ${metric.unit}.`;document.querySelector(`[name="${pendingFollowUp.followUpIndicator}"]`)?.closest('.metric-input')?.classList.add('follow-up-target');}
-  else if(pendingFollowUp.followUpReason==='symptoms')description=`Following up on symptoms reported ${displayDate(source.date)}.`;
-  else if(pendingFollowUp.followUpReason==='stale')description=`Recording a fresh check-in after the entry from ${displayDate(source.date)} became stale.`;
+  if(pendingFollowUp.followUpIndicator){const metric=METRICS[pendingFollowUp.followUpIndicator];description=`Following up on ${metric.label} recorded ${displayDate(source.date)}: ${source[pendingFollowUp.followUpIndicator]} ${metric.unit}. Only this indicator is required; other measurements are optional and stay unmeasured if blank.`;document.querySelector(`[name="${pendingFollowUp.followUpIndicator}"]`)?.closest('.metric-input')?.classList.add('follow-up-target');}
+  else if(pendingFollowUp.followUpReason==='symptoms')description=`Following up on symptoms reported ${displayDate(source.date)}. Measurements are optional and stay unmeasured if blank.`;
+  else if(pendingFollowUp.followUpReason==='stale')description=`Recording a fresh full check-in after the entry from ${displayDate(source.date)} became stale.`;
   $('#follow-up-description').textContent=description;
   $('#follow-up-context').hidden=false;
+  configureMeasurementFields();
 }
 for (const [key,m] of Object.entries(METRICS)) {
   const guide=MEASUREMENT_GUIDES[key];
-  $('#metric-fields').insertAdjacentHTML('beforeend',`<div class="metric-input"><label>${m.label} (${m.unit})<input type="number" name="${key}" min="${m.min}" max="${m.max}" step="${m.step}" required inputmode="decimal"></label><details class="measurement-guide"><summary>How to measure</summary><div class="guide-content"><p>${escape(guide.intro)}</p><p><b>Equipment</b><br>${escape(guide.equipment)}</p><b>How to measure</b><ol>${guide.steps.map(step=>`<li>${escape(step)}</li>`).join('')}</ol><p class="space-tip"><b>ⓘ Space tip</b><br>${escape(guide.spaceTip)}</p></div></details></div>`);
+  $('#metric-fields').insertAdjacentHTML('beforeend',`<div class="metric-input"><label>${m.label} (${m.unit})<input type="number" name="${key}" min="${m.min}" max="${m.max}" step="${m.step}" required inputmode="decimal"><span class="previous-reading" data-previous-for="${key}" hidden></span></label><details class="measurement-guide"><summary>How to measure</summary><div class="guide-content"><p>${escape(guide.intro)}</p><p><b>Equipment</b><br>${escape(guide.equipment)}</p><b>How to measure</b><ol>${guide.steps.map(step=>`<li>${escape(step)}</li>`).join('')}</ol><p class="space-tip"><b>ⓘ Space tip</b><br>${escape(guide.spaceTip)}</p></div></details></div>`);
   $('#chart-metric').insertAdjacentHTML('beforeend',`<option value="${key}">${m.label}</option>`);
 }
 $('#chart-metric').value='sleep'; $('#measurement-time').value=localInputTime();
@@ -58,12 +72,12 @@ function followUpLabel(record){
   return `↳ Fresh check-in following ${sourceTime}`;
 }
 function historyFollowUpButtons(record){const linked=new Set(records.filter(item=>item.followUpTo===record.id).map(item=>item.followUpIndicator||item.followUpReason));const buttons=Object.entries(METRICS).filter(([key,metric])=>(record[key]<metric.envelope[0]||record[key]>metric.envelope[1])&&!linked.has(key)).map(([key,metric])=>`<button type="button" data-history-follow-up="flag" data-follow-up-key="${key}" data-source-id="${record.id}">Follow up ${metric.label}</button>`);if(record.symptoms&&!linked.has('symptoms'))buttons.unshift(`<button type="button" data-history-follow-up="symptoms" data-source-id="${record.id}">Follow up symptoms</button>`);return buttons.length?`<div class="history-follow-ups">${buttons.join('')}</div>`:'—';}
-function historyTable(rows){const keys=Object.keys(METRICS);return `<table><thead><tr><th>Time (local)</th><th>Follow-up relationship</th><th>Available follow-ups</th>${keys.map(k=>`<th>${METRICS[k].label} (${METRICS[k].unit})</th>`).join('')}</tr></thead><tbody>${rows.map(record=>`<tr class="${record.followUpTo?'follow-up-row':''}"><td>${escape(displayDate(record.date))}</td><td class="follow-up-cell">${escape(followUpLabel(record))}</td><td>${historyFollowUpButtons(record)}</td>${keys.map(key=>`<td>${record[key]}</td>`).join('')}</tr>`).join('')}</tbody></table>`;}
+function historyTable(rows){const keys=Object.keys(METRICS);return `<table><thead><tr><th>Time (local)</th><th>Follow-up relationship</th><th>Available follow-ups</th>${keys.map(k=>`<th>${METRICS[k].label} (${METRICS[k].unit})</th>`).join('')}</tr></thead><tbody>${rows.map(record=>`<tr class="${record.followUpTo?'follow-up-row':''}"><td>${escape(displayDate(record.date))}</td><td class="follow-up-cell">${escape(followUpLabel(record))}</td><td>${historyFollowUpButtons(record)}</td>${keys.map(key=>`<td>${Number.isFinite(record[key])?record[key]:'<span class="not-measured">Not measured</span>'}</td>`).join('')}</tr>`).join('')}</tbody></table>`;}
 function renderChart(){
-  const key=$('#chart-metric').value, metric=METRICS[key], rows=records.slice(-14);
+  const key=$('#chart-metric').value, metric=METRICS[key], rows=records.filter(record=>Number.isFinite(record[key])).slice(-14);
   const unhealthy=unhealthyTrendPoints(rows,key), unhealthyCount=unhealthy.filter(Boolean).length;
   $('#chart-table').innerHTML=rows.length?table(rows,[key]):'No values yet.';
-  $('#chart-caption').textContent=rows.length?`${rows.length} check-ins · ${metric.unit}${unhealthyCount?` · ${unhealthyCount} unhealthy ${unhealthyCount===1?'reading':'readings'}`:''}`:'No measurements';
+  $('#chart-caption').textContent=rows.length?`${rows.length} ${rows.length===1?'check-in':'check-ins'} · ${metric.unit}${unhealthyCount?` · ${unhealthyCount} unhealthy ${unhealthyCount===1?'reading':'readings'}`:''}`:'No measurements';
   if(!rows.length){$('#chart').innerHTML='<p class="empty-state">Your trend starts with one check-in.<br>Or load the fictional 14-day demo below.</p>';return;}
   const values=rows.map(r=>r[key]), lo=Math.min(...values), hi=Math.max(...values), pad=Math.max((hi-lo)*.3,metric.step), min=lo-pad,max=hi+pad;
   const x=i=>48+(rows.length===1?234:i/(rows.length-1)*468), y=v=>162-(v-min)/(max-min)*132;
@@ -83,8 +97,8 @@ function render(){
   const latest=records.at(-1), result=assess(latest);
   $('#latest-time').textContent=latest?'Last entry · '+displayDate(latest.date):'No check-ins yet';
   $('#summary').className='summary '+result.state;
-  $('#summary').innerHTML=`<b>${result.title}</b>${result.stale?'<p>Last check-in is over 24 hours old. This snapshot is stale.</p>':''}${latest?.symptoms?'<p>Do not wait for app feedback or a connection. Use the established onboard medical response procedure and notify the designated medical officer.</p>':''}${result.flags.length?'<ul>'+result.flags.map(f=>`<li>${f.message}</li>`).join('')+'</ul><p>Verify the entry and measurement context; review with the designated medical officer under mission procedures. These flags do not diagnose a condition.</p>':latest?'<p>No fictional demo range flags. This does not establish health or rule out illness.</p>':'<p>Enter measurements or load the synthetic demo to explore the console.</p>'}`;
-  $('#metrics').innerHTML=Object.entries(METRICS).map(([key,m])=>{const flag=result.flags.some(f=>f.key===key);return `<div class="metric-card"><div class="label">${m.label}</div><div class="metric-value">${latest?latest[key]:'—'}<small>${m.unit}</small></div><div class="metric-status ${!latest?'empty':flag?'flag':''}">${!latest?'AWAITING MEASUREMENT':flag?'△ UNHEALTHY RANGE':'• HEALTHY RANGE'}</div></div>`;}).join('');
+  $('#summary').innerHTML=`<b>${result.title}</b>${result.stale?'<p>Last check-in is over 24 hours old. This snapshot is stale.</p>':''}${latest?.recordType==='follow-up'?'<p>Only measurements entered for this targeted follow-up were assessed. Other snapshot cards retain their latest real measurement and time.</p>':''}${latest?.symptoms?'<p>Do not wait for app feedback or a connection. Use the established onboard medical response procedure and notify the designated medical officer.</p>':''}${result.flags.length?'<ul>'+result.flags.map(f=>`<li>${f.message}</li>`).join('')+'</ul><p>Verify the entry and measurement context; review with the designated medical officer under mission procedures. These flags do not diagnose a condition.</p>':latest?'<p>No fictional demo range flags in the measurements recorded for this entry. This does not establish health or rule out illness.</p>':'<p>Enter measurements or load the synthetic demo to explore the console.</p>'}`;
+  $('#metrics').innerHTML=Object.entries(METRICS).map(([key,m])=>{const measured=latestMeasurement(key),flag=measured&&(measured[key]<m.envelope[0]||measured[key]>m.envelope[1]);return `<div class="metric-card"><div class="label">${m.label}</div><div class="metric-value">${measured?measured[key]:'—'}<small>${m.unit}</small></div><div class="metric-status ${!measured?'empty':flag?'flag':''}">${!measured?'AWAITING MEASUREMENT':flag?'△ UNHEALTHY RANGE':'• HEALTHY RANGE'}</div><div class="metric-time">${measured?`Measured ${escape(displayDate(measured.date))}`:'No measurement time'}</div></div>`;}).join('');
   $('#record-count').textContent=`${records.length} CHECK-INS`;
   $('#history').innerHTML=records.length?historyTable(records.slice(-30).reverse())+'<p class="muted">Showing latest 30 records. Exports include all records, notes, and follow-up links.</p>':'<p class="empty-state">No check-ins saved yet.</p>';
   $('#export-json').disabled=$('#export-csv').disabled=!records.length;
@@ -92,7 +106,7 @@ function render(){
   renderChart();
 }
 $('#chart-metric').addEventListener('change',renderChart);
-function beginFollowUp(type,key,sourceId){pendingFollowUp={followUpTo:sourceId,followUpIndicator:key||null,followUpReason:type==='flag'?'unhealthy-range':type};renderFollowUpContext();$('#measurement-time').value=localInputTime();$('#checkin').scrollIntoView({behavior:'smooth'});(pendingFollowUp.followUpIndicator?document.querySelector(`[name="${pendingFollowUp.followUpIndicator}"]`):type==='symptoms'?$('#checkin-form [name="symptoms"]'):$('#measurement-time')).focus();}
+function beginFollowUp(type,key,sourceId){pendingFollowUp={followUpTo:sourceId,followUpIndicator:key||null,followUpReason:type==='flag'?'unhealthy-range':type};$('#form-message').textContent='';if(type!=='stale'){document.querySelectorAll('#metric-fields input').forEach(input=>{input.value='';});$('#checkin-form [name="symptoms"]').checked=false;$('#checkin-form [name="notes"]').value='';}renderFollowUpContext();$('#measurement-time').value=localInputTime();$('#checkin').scrollIntoView({behavior:'smooth'});(pendingFollowUp.followUpIndicator?document.querySelector(`[name="${pendingFollowUp.followUpIndicator}"]`):type==='symptoms'?$('#checkin-form [name="symptoms"]'):$('#measurement-time')).focus();}
 $('#action-guidance').addEventListener('click',e=>{
   const trend=e.target.closest('[data-trend]');
   if(trend){$('#chart-metric').value=trend.dataset.trend;renderChart();$('#trends').scrollIntoView({behavior:'smooth'});$('#chart-metric').focus();return;}
@@ -105,8 +119,9 @@ $('#checkin-form').addEventListener('submit',e=>{
   e.preventDefault(); const data=new FormData(e.target);
   try{
     if(records.length>=500)throw new Error('500-check-in demo limit reached. Export and clear records to start a new dataset.');
-    const input={id:createRecordId(),date:new Date(data.get('date')).toISOString(),symptoms:data.has('symptoms'),notes:String(data.get('notes')||''),...(pendingFollowUp||{})};
-    for(const key of Object.keys(METRICS))input[key]=Number(data.get(key));
+    const partial=Boolean(pendingFollowUp&&pendingFollowUp.followUpReason!=='stale');
+    const input={id:createRecordId(),date:new Date(data.get('date')).toISOString(),recordType:partial?'follow-up':'full',symptoms:data.has('symptoms'),notes:String(data.get('notes')||''),...(pendingFollowUp||{})};
+    for(const key of Object.keys(METRICS)){const raw=String(data.get(key)??'').trim();if(raw!=='')input[key]=Number(raw);}
     const record=validateRecord(input);
     if(records.some(r=>r.date===record.date))throw new Error('A check-in already exists at this time. Choose another measurement time.');
     if(record.followUpTo){const source=records.find(r=>r.id===record.followUpTo);if(!source||source.date>=record.date)throw new Error('Choose a follow-up time later than the source check-in.');}

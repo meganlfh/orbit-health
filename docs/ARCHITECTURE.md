@@ -21,15 +21,16 @@ The overview, charts, and history table read the same stored record collection. 
 
 The storage version is separate from the application release version. Neither key contains encrypted data. Clearing browser site data removes these records.
 
-A version 2 JSON export assigns every record an ID and can link a follow-up to its source record and indicator:
+A version 3 JSON export assigns every record an ID, distinguishes full and targeted records, and can link a follow-up to its source record and indicator:
 
 ```json
 {
-  "version": 2,
+  "version": 3,
   "records": [
     {
       "id": "record-001",
       "date": "2026-11-01T08:00:00.000Z",
+      "recordType": "full",
       "heartRate": 68,
       "systolic": 118,
       "temperature": 36.7,
@@ -43,13 +44,8 @@ A version 2 JSON export assigns every record an ID and can link a follow-up to i
     {
       "id": "record-002",
       "date": "2026-11-01T08:15:00.000Z",
-      "heartRate": 68,
-      "systolic": 118,
-      "temperature": 36.7,
-      "glucose": 95,
-      "sleep": 7.8,
+      "recordType": "follow-up",
       "oxygenSaturation": 97.2,
-      "radiationExposure": 0.108,
       "symptoms": false,
       "notes": "Fictional follow-up.",
       "followUpTo": "record-001",
@@ -60,7 +56,7 @@ A version 2 JSON export assigns every record an ID and can link a follow-up to i
 }
 ```
 
-The app also adds an `exportedAt` timestamp when exporting. Import accepts version 1 and version 2 files with at most 500 entries, gives legacy records deterministic IDs, validates every entry and follow-up reference, rejects duplicate timestamps or IDs, and discards unknown record properties. It replaces the collection only after successful validation and user confirmation.
+The app also adds an `exportedAt` timestamp when exporting. Import accepts version 1, version 2, and version 3 files with at most 500 entries, gives legacy records deterministic IDs, validates every entry and follow-up reference, rejects duplicate timestamps or IDs, and discards unknown record properties. It replaces the collection only after successful validation and user confirmation. Full records require every indicator; targeted follow-ups require only their selected indicator and preserve omitted measurements as unmeasured.
 
 CSV exports include every measurement, the symptoms flag, notes, record IDs, and follow-up fields. Values are quoted, embedded quotes are escaped, and text that could be interpreted as a spreadsheet formula is prefixed with an apostrophe.
 

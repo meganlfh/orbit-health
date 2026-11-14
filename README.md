@@ -47,7 +47,7 @@ npm run dev -- --port 8080
 
 Values are entered manually. The app does not connect to wearables, sensors, or a medical service. The symptoms flag displays a reminder to follow the established mission medical protocol; it does not send an alert.
 
-Follow-up check-ins retain a link to the source record and relevant indicator. The form shows the original reading without copying it into the new measurement, and history labels the follow-up as returned to healthy range or still unhealthy. JSON and CSV exports preserve these relationships.
+Follow-up check-ins retain a link to the source record and relevant indicator. Only the selected indicator is required; other indicators show their previous timestamped value and remain unmeasured unless the astronaut enters a new reading. History labels the follow-up as returned to healthy range or still unhealthy, trends skip omitted measurements, and snapshot cards retain the latest real measurement time for each indicator. JSON and CSV exports preserve these relationships.
 
 ## Technology
 
