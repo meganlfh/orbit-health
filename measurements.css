@@ -181,3 +181,35 @@
   stroke: white;
   stroke-width: 9;
 }
+
+.record-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.record-meta #record-count {
+  color: #dce7ef;
+  font-weight: 600;
+}
+
+.compact-footer {
+  justify-content: center;
+  padding-block: 20px 28px;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+}
+
+.compact-footer p {
+  margin: 0;
+}
+
+@media (max-width: 700px) {
+  .record-meta {
+    align-items: flex-start;
+  }
+}
