@@ -6,7 +6,7 @@ Long missions can make regular health monitoring and communication more difficul
 
 ## Features
 
-- **Daily check-ins:** record resting heart rate, systolic pressure, body temperature, glucose, sleep duration, oxygen saturation, cumulative radiation exposure, symptoms, and notes.
+- **Daily check-ins:** record resting heart rate, systolic pressure, body temperature, glucose, sleep duration, oxygen saturation, daily radiation exposure, symptoms, and notes.
 - **Health overview:** see the latest measurements, time of entry, and clearly explained sample-range flags. Entries older than 24 hours are marked as stale.
 - **Actions to take:** review how to check a flagged measurement and its units, record useful context, and follow established mission medical procedures. Symptom reports take priority, and stale records request a fresh check-in.
 - **Trend charts:** switch between indicators and inspect the latest 14 readings, with exact values available in a table.
@@ -82,9 +82,9 @@ Clearing site data can remove the records. Exporting JSON provides a backup of c
 - Maximum JSON import size: **1 MB**.
 - History table: latest **30** entries; exports contain all entries.
 - Measurement times: stored in UTC and displayed in local time.
-- Cumulative radiation exposure is recorded in millisieverts (mSv).
+- Daily radiation exposure is recorded in millisieverts per day (mSv/day).
 
-The oxygen-saturation demo envelope is 95–100%, based on the typical normal pulse-oximeter range described by MedlinePlus. The cumulative radiation demo envelope is 0–600 mSv, using NASA's universal career exposure limit. The radiation limit is a risk-management ceiling, not a zero-risk or clinically “healthy” threshold; both envelopes remain simplified interface demonstrations.
+The oxygen-saturation demo envelope is 95–100%, based on the typical normal pulse-oximeter range described by MedlinePlus. The daily radiation demo envelope is 0–1 mSv/day, covering representative daily exposure levels aboard the International Space Station. It is an operational demo range, not proof that radiation exposure is harmless; both envelopes remain simplified interface demonstrations.
 
 ## Scope and limitations
 
@@ -110,7 +110,7 @@ Chart points are evenly spaced by record, not elapsed time. Records have no indi
 - [NASA: Five Hazards of Human Spaceflight](https://www.nasa.gov/hrp/hazards/)
 - [NASA: The Human Body in Space](https://www.nasa.gov/humans-in-space/the-human-body-in-space/)
 - [NASA: Human Research Program](https://www.nasa.gov/hrp/)
-- [NASA-STD-3001 Volume 1: Crew Health](https://standards.nasa.gov/standard/nasa/nasa-std-3001-vol-1)
+- [NASA: Space Radiation](https://www.nasa.gov/directorates/esdmd/hhp/space-radiation/)
 - [MedlinePlus: Pulse oximetry](https://medlineplus.gov/ency/article/007561.htm)
 
 These resources inform the health background; they do not validate the sample ranges. This project is independent and is not affiliated with or endorsed by NASA.

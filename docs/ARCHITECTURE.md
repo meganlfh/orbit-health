@@ -8,7 +8,7 @@ The check-in form collects measurements and context. `validateRecord` checks fie
 
 `assess` compares the latest entry with the fictional ranges in `METRICS`. It returns individual flags and an independent stale-record status. A concerning-symptoms flag takes priority in the overview message. Range checks do not infer a diagnosis.
 
-Oxygen saturation uses a 95–100% demo envelope. Cumulative radiation exposure uses a 0–600 mSv envelope based on NASA's career exposure limit. The latter is a risk-management ceiling rather than a zero-risk health threshold. These two measurements currently receive range flags without indicator-specific follow-up instructions.
+Oxygen saturation uses a 95–100% demo envelope. Daily radiation exposure uses a 0–1 mSv/day envelope covering representative daily exposure levels aboard the International Space Station. The latter is an operational range rather than a zero-risk health threshold. These two measurements currently receive range flags without indicator-specific follow-up instructions.
 
 The overview, charts, and history table read the same stored record collection. Chart selection changes the indicator without modifying records.
 
