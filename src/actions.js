@@ -20,10 +20,6 @@ const GUIDANCE = {
   sleep: {
     check: 'Review the sleep interval and confirm the total for the last 24 hours is entered in hours.',
     context: 'Record interruptions, schedule changes, perceived sleep quality, and relevant mission demands.'
-  },
-  mood: {
-    check: 'Confirm the self-report uses the 1–5 scale: 1 is very low, 3 is neutral, and 5 is very positive.',
-    context: 'Record recent sleep, workload, isolation or interpersonal context, and any reported symptoms.'
   }
 };
 

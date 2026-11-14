@@ -32,7 +32,8 @@ A version 1 JSON export has the following structure:
       "temperature": 36.7,
       "glucose": 95,
       "sleep": 7.8,
-      "mood": 4,
+      "oxygenSaturation": 97.8,
+      "radiationExposure": 0.108,
       "symptoms": false,
       "notes": "Fictional example."
     }

@@ -5,7 +5,8 @@ export const METRICS = {
   temperature: { label: 'Body temperature', unit: '°C', min: 20, max: 45, step: 0.1, envelope: [36.2, 37.5], system: 'immune' },
   glucose: { label: 'Blood glucose', unit: 'mg/dL', min: 1, max: 1000, step: 1, envelope: [75, 140], system: 'nutrition' },
   sleep: { label: 'Sleep in last 24 hours', unit: 'hours', min: 0, max: 24, step: 0.1, envelope: [7, 9], system: 'mind' },
-  mood: { label: 'Self-reported mood', unit: '/ 5', min: 1, max: 5, step: 1, envelope: [3, 5], system: 'mind' }
+  oxygenSaturation: { label: 'Oxygen saturation (SpO₂)', unit: '%', min: 0, max: 100, step: 0.1, system: 'respiratory' },
+  radiationExposure: { label: 'Radiation exposure', unit: 'mSv', min: 0, max: 100000, step: 0.001, system: 'radiation' }
 };
 export const ROUTINES = ['Record daily check-in', 'Review assigned exercise plan', 'Review food and fluid log', 'Complete private wellbeing reflection'];
 export function validateRecord(input, now = new Date()) {
@@ -32,12 +33,12 @@ export function parseImport(data, now = new Date()) {
 }
 export function assess(record, now = new Date()) {
   if (!record) return {state:'empty', title:'Awaiting your first check-in', flags:[], stale:false};
-  const flags = Object.entries(METRICS).filter(([key, m]) => record[key] < m.envelope[0] || record[key] > m.envelope[1]).map(([key,m]) => ({key, label:m.label, message:`${record[key]} ${m.unit} is outside the fictional demo envelope (${m.envelope.join('–')} ${m.unit}).`}));
+  const flags = Object.entries(METRICS).filter(([key, m]) => m.envelope && (record[key] < m.envelope[0] || record[key] > m.envelope[1])).map(([key,m]) => ({key, label:m.label, message:`${record[key]} ${m.unit} is outside the fictional demo envelope (${m.envelope.join('–')} ${m.unit}).`}));
   const stale = +now - +new Date(record.date) > 24 * 3600000;
   return {state:record.symptoms ? 'urgent' : flags.length ? 'review' : 'logged', title:record.symptoms ? 'Follow the mission medical protocol' : flags.length ? `${flags.length} demo range ${flags.length === 1 ? 'flag' : 'flags'} to review` : 'Check-in recorded', flags, stale};
 }
 export function demoRecords(now = new Date()) {
-  return Array.from({length:14}, (_,i) => ({date:new Date(+now - (13-i)*86400000).toISOString(),heartRate:[66,68,65,70,67,69,72,68,71,74,72,76,78,82][i],systolic:115 + i % 6,temperature:Number((36.6 + (i % 3)/10).toFixed(1)),glucose:92 + i%9,sleep:[8,7.7,8.2,7.5,7.8,7.4,7.6,7.2,7.1,7.5,7,6.8,6.5,6.2][i],mood:i>10?2:4,symptoms:false,notes:i===13?'Synthetic example: interrupted sleep after a busy mission day.':'Synthetic demo record.'}));
+  return Array.from({length:14}, (_,i) => ({date:new Date(+now - (13-i)*86400000).toISOString(),heartRate:[66,68,65,70,67,69,72,68,71,74,72,76,78,82][i],systolic:115 + i % 6,temperature:Number((36.6 + (i % 3)/10).toFixed(1)),glucose:92 + i%9,sleep:[8,7.7,8.2,7.5,7.8,7.4,7.6,7.2,7.1,7.5,7,6.8,6.5,6.2][i],oxygenSaturation:Number((98 - (i % 4)/10).toFixed(1)),radiationExposure:Number((0.08 + i * 0.004).toFixed(3)),symptoms:false,notes:i===13?'Synthetic example: interrupted sleep after a busy mission day.':'Synthetic demo record.'}));
 }
 export function csv(records) {
   const keys = ['date',...Object.keys(METRICS),'symptoms','notes'];

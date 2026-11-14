@@ -6,11 +6,11 @@ Long missions can make regular health monitoring and communication more difficul
 
 ## Features
 
-- **Daily check-ins:** record resting heart rate, systolic pressure, body temperature, glucose, sleep duration, mood, symptoms, and notes.
+- **Daily check-ins:** record resting heart rate, systolic pressure, body temperature, glucose, sleep duration, oxygen saturation, radiation exposure, symptoms, and notes.
 - **Health overview:** see the latest measurements, time of entry, and clearly explained sample-range flags. Entries older than 24 hours are marked as stale.
 - **Actions to take:** review how to check a flagged measurement and its units, record useful context, and follow established mission medical procedures. Symptom reports take priority, and stale records request a fresh check-in.
 - **Trend charts:** switch between indicators and inspect the latest 14 readings, with exact values available in a table.
-- **Body-system explorer:** read background information on cardiovascular health, sleep and mood, immune health, nutrition, and bone and muscle health.
+- **Body-system explorer:** read background information on cardiovascular health, sleep, immune health, nutrition, and bone and muscle health.
 - **Daily routine:** track completion of a personal checklist that resets each local calendar day.
 - **Local records:** save check-ins in the browser and export them as JSON or CSV. Restore records from a validated JSON export.
 - **Offline access:** reload the dashboard after its application files have been cached.
@@ -27,7 +27,7 @@ npm run dev
 
 Open **http://127.0.0.1:5173**.
 
-For a walkthrough, select **Mission records → Load 14-day demo**. The fictional dataset includes changes in sleep and mood so the charts and range flags can be explored. Loading it replaces existing check-ins after confirmation.
+For a walkthrough, select **Mission records → Load 14-day demo**. The fictional dataset includes changing measurements so the charts and range flags can be explored. Loading it replaces existing check-ins after confirmation.
 
 To run on another port:
 
@@ -37,7 +37,7 @@ npm run dev -- --port 8080
 
 ## How it works
 
-1. Enter a measurement time and the six health indicators.
+1. Enter a measurement time and the seven health indicators.
 2. Add relevant context and indicate whether there are concerning symptoms.
 3. Save the check-in to update the overview and charts.
 4. Review non-diagnostic follow-up guidance for any fictional sample-range flags, then open the relevant trend or record a follow-up check-in.
@@ -82,7 +82,7 @@ Clearing site data can remove the records. Exporting JSON provides a backup of c
 - Maximum JSON import size: **1 MB**.
 - History table: latest **30** entries; exports contain all entries.
 - Measurement times: stored in UTC and displayed in local time.
-- Mood scale: **1 = very low, 3 = neutral, 5 = very positive**.
+- Radiation exposure is recorded in millisieverts (mSv).
 
 ## Scope and limitations
 
