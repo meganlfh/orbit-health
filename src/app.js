@@ -1,4 +1,4 @@
-import {METRICS, MEASUREMENT_GUIDES, ROUTINES, validateRecord, parseImport, assess, hasUnusualTrend, demoRecords, csv} from './model.js';
+import {METRICS, MEASUREMENT_GUIDES, ROUTINES, validateRecord, parseImport, assess, unhealthyTrendPoints, demoRecords, csv} from './model.js';
 import {actionGuidance} from './actions.js';
 const $ = s => document.querySelector(s);
 const KEY = 'orbit-health-v1', ROUTINE_KEY = 'orbit-routine-v1';
@@ -39,14 +39,14 @@ $('#routines').addEventListener('change',e=>{
 function table(rows, keys){return `<table><thead><tr><th>Time (local)</th>${keys.map(k=>`<th>${METRICS[k].label} (${METRICS[k].unit})</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr><td>${escape(displayDate(r.date))}</td>${keys.map(k=>`<td>${r[k]}</td>`).join('')}</tr>`).join('')}</tbody></table>`;}
 function renderChart(){
   const key=$('#chart-metric').value, metric=METRICS[key], rows=records.slice(-14);
-  const unusual=hasUnusualTrend(rows,key);
+  const unhealthy=unhealthyTrendPoints(rows,key), unhealthyCount=unhealthy.filter(Boolean).length;
   $('#chart-table').innerHTML=rows.length?table(rows,[key]):'No values yet.';
-  $('#chart-caption').textContent=rows.length?`${rows.length} check-ins · ${metric.unit}${unusual?' · unusual change detected':''}`:'No measurements';
+  $('#chart-caption').textContent=rows.length?`${rows.length} check-ins · ${metric.unit}${unhealthyCount?` · ${unhealthyCount} unhealthy ${unhealthyCount===1?'reading':'readings'}`:''}`:'No measurements';
   if(!rows.length){$('#chart').innerHTML='<p class="empty-state">Your trend starts with one check-in.<br>Or load the fictional 14-day demo below.</p>';return;}
   const values=rows.map(r=>r[key]), lo=Math.min(...values), hi=Math.max(...values), pad=Math.max((hi-lo)*.3,metric.step), min=lo-pad,max=hi+pad;
   const x=i=>48+(rows.length===1?234:i/(rows.length-1)*468), y=v=>162-(v-min)/(max-min)*132;
-  const points=values.map((v,i)=>`${x(i)},${y(v)}`).join(' ');
-  $('#chart').innerHTML=`<svg viewBox="0 0 540 205" role="img" aria-label="${metric.label} across ${rows.length} check-ins.${unusual?' Unusual change detected.':''} Exact values are in the table below."><title>${metric.label} (${metric.unit})</title>${[min,(min+max)/2,max].map(v=>`<line class="grid" x1="48" x2="516" y1="${y(v)}" y2="${y(v)}"/><text x="3" y="${y(v)+4}">${v.toFixed(1)}</text>`).join('')}<polyline class="line${unusual?' alert':''}" points="${points}"/>${values.map((v,i)=>`<circle class="point${unusual?' alert':''}" cx="${x(i)}" cy="${y(v)}" r="3"><title>${escape(displayDate(rows[i].date))}: ${v} ${metric.unit}</title></circle>`).join('')}<text x="48" y="193">${escape(displayDate(rows[0].date))}</text><text x="516" y="193" text-anchor="end">${rows.length>1?escape(displayDate(rows.at(-1).date)):''}</text></svg>`;
+  const segments=values.slice(1).map((value,i)=>`<line class="trend-segment${unhealthy[i]||unhealthy[i+1]?' alert':''}" x1="${x(i)}" y1="${y(values[i])}" x2="${x(i+1)}" y2="${y(value)}"/>`).join('');
+  $('#chart').innerHTML=`<svg viewBox="0 0 540 205" role="img" aria-label="${metric.label} across ${rows.length} check-ins.${unhealthyCount?` ${unhealthyCount} unhealthy ${unhealthyCount===1?'reading':'readings'}.`:''} Exact values are in the table below."><title>${metric.label} (${metric.unit})</title>${[min,(min+max)/2,max].map(v=>`<line class="grid" x1="48" x2="516" y1="${y(v)}" y2="${y(v)}"/><text x="3" y="${y(v)+4}">${v.toFixed(1)}</text>`).join('')}${segments}${values.map((v,i)=>`<circle class="point${unhealthy[i]?' alert':''}" cx="${x(i)}" cy="${y(v)}" r="3"><title>${escape(displayDate(rows[i].date))}: ${v} ${metric.unit}${unhealthy[i]?' — unhealthy range':''}</title></circle>`).join('')}<text x="48" y="193">${escape(displayDate(rows[0].date))}</text><text x="516" y="193" text-anchor="end">${rows.length>1?escape(displayDate(rows.at(-1).date)):''}</text></svg>`;
 }
 function renderActions(latest){
   const actions=actionGuidance(latest);
@@ -97,8 +97,13 @@ const systems={
   nutrition:{title:'Nutrition & metabolic context',body:'Food intake and metabolic measurements need context, including meal timing and measurement method.',measure:'Blood glucose is entered manually in mg/dL. The demo does not distinguish fasting and post-meal readings and must not be used to guide diet, medication, or treatment.'},
   bone:{title:'Bone & muscle health',body:'Altered gravity is one of the hazards NASA investigates. This app does not measure bone density, muscle strength, or exercise effectiveness.',measure:'Use the routine checklist to review the exercise plan assigned by the mission team. A checked task is a completion record, not evidence of improved bone or muscle health.'}
 };
-function showSystem(key){const s=systems[key];$('#system-detail').innerHTML=`<h3>${s.title}</h3><p>${s.body}</p><p>${s.measure}</p><a href="https://www.nasa.gov/humans-in-space/the-human-body-in-space/" target="_blank" rel="noopener noreferrer">Read NASA’s human body in space overview ↗</a>`;document.querySelectorAll('[data-system]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.system===key)));}
+function showSystem(key){const s=systems[key];$('#system-detail').innerHTML=`<h3>${s.title}</h3><p>${s.body}</p><p>${s.measure}</p><a href="https://www.nasa.gov/humans-in-space/the-human-body-in-space/" target="_blank" rel="noopener noreferrer">Read NASA’s human body in space overview ↗</a>`;document.querySelectorAll('[data-system]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.system===key)));document.querySelectorAll('[data-body-system]').forEach(point=>{const active=point.dataset.bodySystem===key;point.classList.toggle('active',active);point.setAttribute('aria-pressed',String(active));});}
 document.querySelectorAll('[data-system]').forEach(b=>b.addEventListener('click',()=>showSystem(b.dataset.system)));
+document.querySelectorAll('[data-body-system]').forEach(point=>{point.addEventListener('click',()=>showSystem(point.dataset.bodySystem));point.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();showSystem(point.dataset.bodySystem);}});});
+const navLinks=[...document.querySelectorAll('.nav-item[href^="#"]')];
+const navTargets=navLinks.map(link=>({link,section:document.querySelector(link.getAttribute('href'))})).filter(item=>item.section);
+function updateActiveNavigation(){const marker=innerHeight*.35;const passed=navTargets.filter(item=>item.section.getBoundingClientRect().top<=marker).sort((a,b)=>a.section.getBoundingClientRect().top-b.section.getBoundingClientRect().top);const active=(passed.at(-1)||navTargets[0])?.link;navLinks.forEach(link=>{const selected=link===active;link.classList.toggle('active',selected);if(selected)link.setAttribute('aria-current','location');else link.removeAttribute('aria-current');});}
+addEventListener('scroll',updateActiveNavigation,{passive:true});addEventListener('resize',updateActiveNavigation);updateActiveNavigation();
 function download(content,name,type){const url=URL.createObjectURL(new Blob([content],{type}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 $('#export-json').addEventListener('click',()=>download(JSON.stringify({version:1,exportedAt:new Date().toISOString(),records},null,2),'orbit-health-records.json','application/json'));
 $('#export-csv').addEventListener('click',()=>download(csv(records),'orbit-health-records.csv','text/csv'));

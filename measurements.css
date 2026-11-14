@@ -45,10 +45,43 @@
   background: #132a28;
 }
 
-.chart .line.alert {
+.chart .trend-segment {
+  stroke: var(--mint);
+  stroke-width: 2.5;
+}
+
+.chart .trend-segment.alert {
   stroke: var(--red);
 }
 
 .chart .point.alert {
   fill: var(--red);
+}
+
+.sidebar .nav-item:first-child {
+  background: transparent;
+  color: var(--muted);
+}
+
+.sidebar .nav-item.active {
+  background: #18352f;
+  color: var(--mint);
+}
+
+.body-art .signal {
+  cursor: pointer;
+  transition: fill .15s, stroke .15s, stroke-width .15s;
+}
+
+.body-art .signal:hover,
+.body-art .signal.active {
+  fill: #e6fff5;
+  stroke: var(--mint);
+  stroke-width: 8;
+}
+
+.body-art .signal:focus {
+  outline: none;
+  stroke: white;
+  stroke-width: 9;
 }

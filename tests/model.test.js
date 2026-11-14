@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {METRICS,MEASUREMENT_GUIDES,assess,hasUnusualTrend,validateRecord,parseImport,demoRecords,csv} from '../src/model.js';
+import {METRICS,MEASUREMENT_GUIDES,assess,unhealthyTrendPoints,validateRecord,parseImport,demoRecords,csv} from '../src/model.js';
 import {actionGuidance} from '../src/actions.js';
 const now=new Date('2026-11-12T12:00:00Z');
 const valid=()=>({...demoRecords(now)[0],date:now.toISOString()});
@@ -13,7 +13,7 @@ test('import validates atomically, limits size, rejects duplicates and sorts',()
 test('oxygen saturation and daily radiation exposure use inclusive demo envelopes',()=>{let r=validateRecord({...valid(),oxygenSaturation:95,radiationExposure:1},now);assert.ok(!assess(r,now).flags.some(f=>['oxygenSaturation','radiationExposure'].includes(f.key)));r={...r,oxygenSaturation:94.9,radiationExposure:1.001};assert.deepEqual(assess(r,now).flags.filter(f=>['oxygenSaturation','radiationExposure'].includes(f.key)).map(f=>f.key),['oxygenSaturation','radiationExposure']);});
 test('new indicator flags do not add follow-up instructions yet',()=>{const actions=actionGuidance({...valid(),oxygenSaturation:90,radiationExposure:1.1},now);assert.ok(!actions.some(a=>['oxygenSaturation','radiationExposure'].includes(a.key)));});
 test('every indicator has equipment, steps, and a space tip',()=>{assert.deepEqual(Object.keys(MEASUREMENT_GUIDES),Object.keys(METRICS));for(const guide of Object.values(MEASUREMENT_GUIDES)){assert.ok(guide.equipment);assert.ok(guide.steps.length>=3);assert.ok(guide.spaceTip);assert.ok(!JSON.stringify(guide).match(/seek help/i));}});
-test('trend detection catches unhealthy values and indicator-specific spikes',()=>{const rows=[valid(),{...valid(),heartRate:70,date:'2026-11-12T12:01:00Z'}];assert.equal(hasUnusualTrend(rows,'heartRate'),false);rows[1].heartRate=85;assert.equal(hasUnusualTrend(rows,'heartRate'),true);rows[1].heartRate=100;assert.equal(hasUnusualTrend(rows,'heartRate'),true);assert.equal(hasUnusualTrend(rows,'unknown'),false);});
+test('trend detection marks only readings outside the healthy envelope',()=>{const rows=[{...valid(),heartRate:70},{...valid(),heartRate:100},{...valid(),heartRate:75}];assert.deepEqual(unhealthyTrendPoints(rows,'heartRate'),[false,true,false]);assert.deepEqual(unhealthyTrendPoints(rows,'unknown'),[]);});
 test('CSV escapes quotes, commas, line breaks and spreadsheet formulas',()=>{const output=csv([{...valid(),notes:' =HYPERLINK("bad")\ncomma,'}]);assert.ok(output.includes('"\' =HYPERLINK(""bad"")\ncomma,"'));});
 test('unknown imported properties are discarded',()=>{const r=validateRecord({...valid(),injected:'<script>'},now);assert.equal(r.injected,undefined);});
 test('synthetic demo round trips through export/import validation',()=>assert.equal(parseImport(JSON.parse(JSON.stringify({version:1,records:demoRecords(now)})),now).length,14));

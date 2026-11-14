@@ -73,7 +73,7 @@ npm test
 
 The tests cover input validation, symptom priority, stale-record follow-up, per-indicator action guidance, range boundaries, import validation, duplicate timestamps, CSV escaping, and sample-data round trips. GitHub Actions runs the checks on pushes and pull requests.
 
-Trend lines turn red when a reading is outside its demo envelope or when consecutive readings meet the indicator-specific sudden-change threshold. The chart caption also reports the unusual change so the warning does not rely on color alone.
+Trend points outside the demo envelope turn red, along with the adjacent line segments that connect to them. Healthy points and unrelated segments remain mint. The chart caption also reports the number of unhealthy readings so the warning does not rely on color alone.
 
 ## Data and privacy
 

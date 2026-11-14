@@ -1,12 +1,12 @@
 // These fictional envelopes are UI demonstrations, NOT clinical thresholds.
 export const METRICS = {
-  heartRate: { label: 'Resting heart rate', unit: 'bpm', min: 1, max: 300, step: 1, envelope: [55, 90], trendDelta: 15, system: 'cardio' },
-  systolic: { label: 'Systolic pressure', unit: 'mmHg', min: 1, max: 300, step: 1, envelope: [100, 135], trendDelta: 15, system: 'cardio' },
-  temperature: { label: 'Body temperature', unit: '°C', min: 20, max: 45, step: 0.1, envelope: [36.2, 37.5], trendDelta: 1, system: 'immune' },
-  glucose: { label: 'Blood glucose', unit: 'mg/dL', min: 1, max: 1000, step: 1, envelope: [75, 140], trendDelta: 30, system: 'nutrition' },
-  sleep: { label: 'Sleep in last 24 hours', unit: 'hours', min: 0, max: 24, step: 0.1, envelope: [7, 9], trendDelta: 2, system: 'mind' },
-  oxygenSaturation: { label: 'Oxygen saturation (SpO₂)', unit: '%', min: 0, max: 100, step: 0.1, envelope: [95, 100], trendDelta: 3, system: 'respiratory' },
-  radiationExposure: { label: 'Daily radiation exposure', unit: 'mSv/day', min: 0, max: 100000, step: 0.001, envelope: [0, 1], trendDelta: 0.25, system: 'radiation' }
+  heartRate: { label: 'Resting heart rate', unit: 'bpm', min: 1, max: 300, step: 1, envelope: [55, 90], system: 'cardio' },
+  systolic: { label: 'Systolic pressure', unit: 'mmHg', min: 1, max: 300, step: 1, envelope: [100, 135], system: 'cardio' },
+  temperature: { label: 'Body temperature', unit: '°C', min: 20, max: 45, step: 0.1, envelope: [36.2, 37.5], system: 'immune' },
+  glucose: { label: 'Blood glucose', unit: 'mg/dL', min: 1, max: 1000, step: 1, envelope: [75, 140], system: 'nutrition' },
+  sleep: { label: 'Sleep in last 24 hours', unit: 'hours', min: 0, max: 24, step: 0.1, envelope: [7, 9], system: 'mind' },
+  oxygenSaturation: { label: 'Oxygen saturation (SpO₂)', unit: '%', min: 0, max: 100, step: 0.1, envelope: [95, 100], system: 'respiratory' },
+  radiationExposure: { label: 'Daily radiation exposure', unit: 'mSv/day', min: 0, max: 100000, step: 0.001, envelope: [0, 1], system: 'radiation' }
 };
 export const MEASUREMENT_GUIDES = {
   heartRate: {
@@ -81,13 +81,11 @@ export function assess(record, now = new Date()) {
   const stale = +now - +new Date(record.date) > 24 * 3600000;
   return {state:record.symptoms ? 'urgent' : flags.length ? 'review' : 'logged', title:record.symptoms ? 'Follow the mission medical protocol' : flags.length ? `${flags.length} demo range ${flags.length === 1 ? 'flag' : 'flags'} to review` : 'Check-in recorded', flags, stale};
 }
-export function hasUnusualTrend(records, key) {
+export function unhealthyTrendPoints(records, key) {
   const metric = METRICS[key];
-  if (!metric || !Array.isArray(records) || !records.length) return false;
+  if (!metric || !Array.isArray(records)) return [];
   const values = records.map(record => record[key]);
-  if (values.some(value => !Number.isFinite(value))) return false;
-  if (values.some(value => value < metric.envelope[0] || value > metric.envelope[1])) return true;
-  return values.slice(1).some((value, index) => Math.abs(value - values[index]) >= metric.trendDelta);
+  return values.map(value => Number.isFinite(value) && (value < metric.envelope[0] || value > metric.envelope[1]));
 }
 export function demoRecords(now = new Date()) {
   return Array.from({length:14}, (_,i) => ({date:new Date(+now - (13-i)*86400000).toISOString(),heartRate:[66,68,65,70,67,69,72,68,71,74,72,76,78,82][i],systolic:115 + i % 6,temperature:Number((36.6 + (i % 3)/10).toFixed(1)),glucose:92 + i%9,sleep:[8,7.7,8.2,7.5,7.8,7.4,7.6,7.2,7.1,7.5,7,6.8,6.5,6.2][i],oxygenSaturation:Number((98 - (i % 4)/10).toFixed(1)),radiationExposure:Number((0.08 + i * 0.004).toFixed(3)),symptoms:false,notes:i===13?'Synthetic example: interrupted sleep after a busy mission day.':'Synthetic demo record.'}));
