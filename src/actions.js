@@ -2,28 +2,48 @@ import {METRICS, assess} from './model.js';
 
 const GUIDANCE = {
   heartRate: {
-    check: 'Repeat the resting count with the mission-approved method and confirm the value is entered in beats per minute (bpm).',
-    context: 'Record posture, recent activity, measurement time, and the device or counting method used.'
+    recheck: 'Stop exercising, secure yourself in a stable position, rest, and repeat the heart-rate measurement.',
+    takeAction: 'Check for dizziness, chest pain, or breathlessness, and consider recent exercise, dehydration, and microgravity-related cardiovascular changes.',
+    seekHelp: 'Inform the crew medical officer if abnormal readings persist or concerning symptoms are present.',
+    spaceTip: 'Compare the result with your personal baseline and recent activity.'
   },
   systolic: {
-    check: 'Repeat the measurement with the mission-approved cuff and technique; confirm this is the systolic value in millimetres of mercury (mmHg).',
-    context: 'Record posture, cuff and arm used, recent activity, and measurement time.'
+    recheck: 'Secure yourself, rest for 5 minutes, and repeat the measurement with your arm supported at heart level.',
+    takeAction: 'Check for dizziness, headache, or vision changes, and avoid sudden movements if you feel dizzy.',
+    seekHelp: 'Follow the crew medical protocol if the reading remains abnormal or concerning symptoms are present.',
+    spaceTip: 'Microgravity-related fluid shifts can affect blood pressure; keep your position consistent between readings.'
   },
   temperature: {
-    check: 'Repeat with the mission-approved thermometer and method; confirm the value is entered in degrees Celsius (°C).',
-    context: 'Record the measurement site and device, recent activity, environment, and measurement time.'
+    recheck: 'Rest and repeat the temperature measurement using the same approved device and measurement site.',
+    takeAction: 'Check for fever, chills, other symptoms, and unusual cabin temperature or environmental conditions.',
+    seekHelp: 'Notify the crew medical officer if the abnormal reading persists or concerning symptoms are present.',
+    spaceTip: 'In a closed spacecraft, report possible infection symptoms early under the mission medical protocol.'
   },
   glucose: {
-    check: 'Repeat with the mission-approved measurement method and confirm the value is entered in milligrams per decilitre (mg/dL).',
-    context: 'Record meal timing, recent activity, measurement method, and measurement time.'
+    recheck: 'Repeat the measurement with clean, mission-approved equipment if the reading may be inaccurate.',
+    takeAction: 'For a low reading, follow the onboard hypoglycaemia protocol, including prescribed fast-acting glucose. For a high reading, follow the approved hydration and medical-management plan.',
+    seekHelp: 'Notify the crew medical officer if abnormal readings persist or symptoms are present.',
+    spaceTip: 'Keep glucose supplies sealed and prevent blood contamination in microgravity.'
   },
   sleep: {
-    check: 'Review the sleep interval and confirm the total for the last 24 hours is entered in hours.',
-    context: 'Record interruptions, schedule changes, perceived sleep quality, and relevant mission demands.'
+    recheck: 'Review the tracker or log and confirm the sleep and wake times and total sleep for the last 24 hours.',
+    takeAction: 'Follow the mission sleep schedule, reduce light and noise before scheduled sleep, and avoid caffeine close to bedtime.',
+    seekHelp: 'Report persistent fatigue, poor sleep, or concentration difficulties through the crew medical protocol.',
+    spaceTip: 'Use spacecraft lighting schedules to support circadian rhythms rather than relying on sunrise or sunset.'
+  },
+  oxygenSaturation: {
+    recheck: 'Stop physical activity, secure yourself, check sensor placement, and repeat the measurement if it is safe to do so.',
+    takeAction: 'Check the spacecraft oxygen, pressure, and carbon-dioxide monitoring systems for an environmental problem.',
+    seekHelp: 'Alert the crew and follow mission emergency-oxygen procedures if required.',
+    spaceTip: 'Low oxygen saturation can indicate a spacecraft environmental problem, not only a personal health issue.'
+  },
+  radiationExposure: {
+    recheck: 'Verify the daily dose on your assigned dosimeter and check current mission radiation alerts.',
+    takeAction: 'Stop non-essential activities, move to the designated radiation shelter, and follow shielding procedures when directed.',
+    seekHelp: 'Follow the mission radiation-emergency protocol, monitor the dosimeter, and remain sheltered until the crew receives clearance.',
+    spaceTip: 'Use the spacecraft’s most effectively shielded area during radiation events.'
   }
 };
-
-const followUp = 'Report the verified reading and recorded context through established mission medical procedures, and follow instructions from designated medical personnel.';
 
 export function actionGuidance(record, now = new Date()) {
   if (!record) return [];
@@ -49,15 +69,16 @@ export function actionGuidance(record, now = new Date()) {
   }
 
   for (const flag of result.flags) {
-    // New measurements can be flagged before follow-up guidance is authored.
-    if (!GUIDANCE[flag.key]) continue;
+    const guidance = GUIDANCE[flag.key];
     actions.push({
       type: 'flag',
       key: flag.key,
-      title: `${METRICS[flag.key].label}: review the fictional sample-range flag`,
-      check: GUIDANCE[flag.key].check,
-      context: GUIDANCE[flag.key].context,
-      followUp,
+      title: `${METRICS[flag.key].label}: unhealthy range actions`,
+      recheck: guidance.recheck,
+      takeAction: guidance.takeAction,
+      seekHelp: guidance.seekHelp,
+      spaceTip: guidance.spaceTip,
+      followUp: true,
       trend: true
     });
   }

@@ -8,7 +8,7 @@ Long missions can make regular health monitoring and communication more difficul
 
 - **Daily check-ins:** record resting heart rate, systolic pressure, body temperature, glucose, sleep duration, oxygen saturation, daily radiation exposure, symptoms, and notes.
 - **Health overview:** see the latest measurements, time of entry, and clearly explained sample-range flags. Entries older than 24 hours are marked as stale.
-- **Actions to take:** review how to check a flagged measurement and its units, record useful context, and follow established mission medical procedures. Symptom reports take priority, and stale records request a fresh check-in.
+- **Actions to take:** follow indicator-specific Recheck → Take action → Seek help guidance and a space tip for unhealthy-range measurements. Symptom reports take priority, and stale records request a fresh check-in.
 - **Trend charts:** switch between indicators and inspect the latest 14 readings, with exact values available in a table.
 - **Measurement guides:** expand equipment, measurement steps, and a space-specific tip beneath every check-in indicator.
 - **Body-system explorer:** read background information on cardiovascular health, sleep, immune health, nutrition, and bone and muscle health.

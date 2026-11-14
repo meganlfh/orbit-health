@@ -52,7 +52,7 @@ function renderActions(latest){
   const actions=actionGuidance(latest);
   $('#action-guidance').innerHTML=actions.length?actions.map(action=>{
     const priority=action.type==='symptoms'?' priority':'';
-    const body=action.type==='flag'?`<ol><li><b>Check the measurement and units.</b> ${action.check}</li><li><b>Record context.</b> ${action.context}</li><li><b>Follow up.</b> ${action.followUp}</li></ol>`:`<p>${action.detail}</p>`;
+    const body=action.type==='flag'?`<ol class="action-sequence"><li><b>Recheck.</b> ${action.recheck}</li><li><b>Take action.</b> ${action.takeAction}</li><li><b>Seek help.</b> ${action.seekHelp}</li></ol><p class="action-space-tip"><b>ⓘ Space tip</b><br>${action.spaceTip}</p>`:`<p>${action.detail}</p>`;
     const buttons=`<div class="action-buttons">${action.trend?`<button type="button" data-trend="${action.key}">View ${METRICS[action.key].label} trend</button>`:''}${action.followUp?`<button type="button" data-follow-up="${action.type}">${action.type==='stale'?'Record fresh check-in':'Record a follow-up'}</button>`:''}</div>`;
     return `<article class="action-card${priority}"><h3>${action.title}</h3>${body}${buttons}</article>`;
   }).join(''):'<p class="empty-state">No follow-up actions from the latest check-in. Fictional sample ranges do not establish health or rule out illness.</p>';
