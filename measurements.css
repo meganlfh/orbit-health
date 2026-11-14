@@ -2,6 +2,71 @@
   min-width: 0;
 }
 
+.follow-up-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 18px;
+  padding: 12px 14px;
+  border: 1px solid #4b806f;
+  border-left: 3px solid var(--mint);
+  border-radius: 7px;
+  background: #132a28;
+  color: #cce9df;
+}
+
+.follow-up-context[hidden] {
+  display: none;
+}
+
+.follow-up-context b,
+.follow-up-context span {
+  display: block;
+}
+
+.follow-up-context span {
+  margin-top: 2px;
+  font-size: 12px;
+}
+
+.follow-up-context button {
+  flex-shrink: 0;
+  padding: 7px 10px;
+  font-size: 11px;
+}
+
+.metric-input.follow-up-target {
+  padding: 9px;
+  margin: -9px;
+  border-radius: 8px;
+  outline: 2px solid var(--mint);
+  background: #132a2866;
+}
+
+.follow-up-row {
+  background: #132a284d;
+}
+
+.follow-up-cell {
+  min-width: 300px;
+  color: var(--mint);
+  white-space: normal;
+}
+
+.history-follow-ups {
+  display: flex;
+  min-width: 220px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.history-follow-ups button {
+  padding: 5px 7px;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
 .measurement-guide {
   margin-top: 8px;
   border: 1px solid #2d4657;

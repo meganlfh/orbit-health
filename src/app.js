@@ -1,11 +1,12 @@
 import {METRICS, MEASUREMENT_GUIDES, ROUTINES, validateRecord, parseImport, assess, unhealthyTrendPoints, demoRecords, csv} from './model.js';
 import {actionGuidance} from './actions.js';
 const $ = s => document.querySelector(s);
-const KEY = 'orbit-health-v1', ROUTINE_KEY = 'orbit-routine-v1';
-let records = [], storageAvailable = true, checked = [];
+const KEY = 'orbit-health-v1', ROUTINE_KEY = 'orbit-routine-v1', DATA_VERSION = 2;
+let records = [], storageAvailable = true, checked = [], pendingFollowUp = null;
 const escape = s => String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const createRecordId = () => globalThis.crypto?.randomUUID?.() || `record-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,10)}`;
 const localDay = () => new Date().toLocaleDateString('en-CA');
-const localInputTime = () => {const now=new Date(); return new Date(+now-now.getTimezoneOffset()*60000).toISOString().slice(0,16);};
+const localInputTime = () => {const now=new Date(); return new Date(+now-now.getTimezoneOffset()*60000).toISOString().slice(0,19);};
 const displayDate = date => new Date(date).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
 try {
   const raw = localStorage.getItem(KEY);
@@ -15,10 +16,22 @@ try {
 } catch { $('#data-message').textContent = 'Stored data could not be read. It was not overwritten. Export or clear browser data before continuing.'; storageAvailable=false; }
 function persist(next) {
   // Commit state only after storage succeeds. Do not pretend failed writes are saved.
-  try {localStorage.setItem(KEY, JSON.stringify({version:1,records:next})); records=next; storageAvailable=true; updateConnection(); return true;}
+  try {localStorage.setItem(KEY, JSON.stringify({version:DATA_VERSION,records:next})); records=next; storageAvailable=true; updateConnection(); return true;}
   catch {storageAvailable=false; updateConnection(); $('#data-message').textContent='Could not save: browser storage is unavailable or full. Export your existing records.'; return false;}
 }
 function updateConnection(){ $('#connection').textContent = !storageAvailable ? 'Storage unavailable' : navigator.onLine ? 'Local storage · online' : 'Local storage · offline'; }
+function renderFollowUpContext(){
+  document.querySelectorAll('.metric-input.follow-up-target').forEach(field=>field.classList.remove('follow-up-target'));
+  if(!pendingFollowUp){$('#follow-up-context').hidden=true;return;}
+  const source=records.find(record=>record.id===pendingFollowUp.followUpTo);
+  if(!source){pendingFollowUp=null;$('#follow-up-context').hidden=true;return;}
+  let description=`Following up on the check-in recorded ${displayDate(source.date)}.`;
+  if(pendingFollowUp.followUpIndicator){const metric=METRICS[pendingFollowUp.followUpIndicator];description=`Following up on ${metric.label} recorded ${displayDate(source.date)}: ${source[pendingFollowUp.followUpIndicator]} ${metric.unit}.`;document.querySelector(`[name="${pendingFollowUp.followUpIndicator}"]`)?.closest('.metric-input')?.classList.add('follow-up-target');}
+  else if(pendingFollowUp.followUpReason==='symptoms')description=`Following up on symptoms reported ${displayDate(source.date)}.`;
+  else if(pendingFollowUp.followUpReason==='stale')description=`Recording a fresh check-in after the entry from ${displayDate(source.date)} became stale.`;
+  $('#follow-up-description').textContent=description;
+  $('#follow-up-context').hidden=false;
+}
 for (const [key,m] of Object.entries(METRICS)) {
   const guide=MEASUREMENT_GUIDES[key];
   $('#metric-fields').insertAdjacentHTML('beforeend',`<div class="metric-input"><label>${m.label} (${m.unit})<input type="number" name="${key}" min="${m.min}" max="${m.max}" step="${m.step}" required inputmode="decimal"></label><details class="measurement-guide"><summary>How to measure</summary><div class="guide-content"><p>${escape(guide.intro)}</p><p><b>Equipment</b><br>${escape(guide.equipment)}</p><b>How to measure</b><ol>${guide.steps.map(step=>`<li>${escape(step)}</li>`).join('')}</ol><p class="space-tip"><b>ⓘ Space tip</b><br>${escape(guide.spaceTip)}</p></div></details></div>`);
@@ -37,6 +50,15 @@ $('#routines').addEventListener('change',e=>{
   catch {$('#routine-count').textContent='Could not save routine progress.'; e.target.checked=!e.target.checked;}
 });
 function table(rows, keys){return `<table><thead><tr><th>Time (local)</th>${keys.map(k=>`<th>${METRICS[k].label} (${METRICS[k].unit})</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr><td>${escape(displayDate(r.date))}</td>${keys.map(k=>`<td>${r[k]}</td>`).join('')}</tr>`).join('')}</tbody></table>`;}
+function followUpLabel(record){
+  if(!record.followUpTo)return '—';
+  const source=records.find(item=>item.id===record.followUpTo), sourceTime=source?displayDate(source.date):'missing record';
+  if(record.followUpIndicator){const metric=METRICS[record.followUpIndicator],healthy=record[record.followUpIndicator]>=metric.envelope[0]&&record[record.followUpIndicator]<=metric.envelope[1];return `↳ Follow-up to ${sourceTime} · ${metric.label} · ${healthy?'Returned to healthy range':'Still unhealthy'}`;}
+  if(record.followUpReason==='symptoms')return `↳ Symptoms follow-up to ${sourceTime} · ${record.symptoms?'Symptoms still reported':'No symptoms reported'}`;
+  return `↳ Fresh check-in following ${sourceTime}`;
+}
+function historyFollowUpButtons(record){const linked=new Set(records.filter(item=>item.followUpTo===record.id).map(item=>item.followUpIndicator||item.followUpReason));const buttons=Object.entries(METRICS).filter(([key,metric])=>(record[key]<metric.envelope[0]||record[key]>metric.envelope[1])&&!linked.has(key)).map(([key,metric])=>`<button type="button" data-history-follow-up="flag" data-follow-up-key="${key}" data-source-id="${record.id}">Follow up ${metric.label}</button>`);if(record.symptoms&&!linked.has('symptoms'))buttons.unshift(`<button type="button" data-history-follow-up="symptoms" data-source-id="${record.id}">Follow up symptoms</button>`);return buttons.length?`<div class="history-follow-ups">${buttons.join('')}</div>`:'—';}
+function historyTable(rows){const keys=Object.keys(METRICS);return `<table><thead><tr><th>Time (local)</th><th>Follow-up relationship</th><th>Available follow-ups</th>${keys.map(k=>`<th>${METRICS[k].label} (${METRICS[k].unit})</th>`).join('')}</tr></thead><tbody>${rows.map(record=>`<tr class="${record.followUpTo?'follow-up-row':''}"><td>${escape(displayDate(record.date))}</td><td class="follow-up-cell">${escape(followUpLabel(record))}</td><td>${historyFollowUpButtons(record)}</td>${keys.map(key=>`<td>${record[key]}</td>`).join('')}</tr>`).join('')}</tbody></table>`;}
 function renderChart(){
   const key=$('#chart-metric').value, metric=METRICS[key], rows=records.slice(-14);
   const unhealthy=unhealthyTrendPoints(rows,key), unhealthyCount=unhealthy.filter(Boolean).length;
@@ -53,7 +75,7 @@ function renderActions(latest){
   $('#action-guidance').innerHTML=actions.length?actions.map(action=>{
     const priority=action.type==='symptoms'?' priority':'';
     const body=action.type==='flag'?`<ol class="action-sequence"><li><b>Recheck.</b> ${action.recheck}</li><li><b>Take action.</b> ${action.takeAction}</li><li><b>Seek help.</b> ${action.seekHelp}</li></ol><p class="action-space-tip"><b>ⓘ Space tip</b><br>${action.spaceTip}</p>`:`<p>${action.detail}</p>`;
-    const buttons=`<div class="action-buttons">${action.trend?`<button type="button" data-trend="${action.key}">View ${METRICS[action.key].label} trend</button>`:''}${action.followUp?`<button type="button" data-follow-up="${action.type}">${action.type==='stale'?'Record fresh check-in':'Record a follow-up'}</button>`:''}</div>`;
+    const buttons=`<div class="action-buttons">${action.trend?`<button type="button" data-trend="${action.key}">View ${METRICS[action.key].label} trend</button>`:''}${action.followUp?`<button type="button" data-follow-up="${action.type}" data-follow-up-key="${action.key||''}" data-source-id="${latest.id}">${action.type==='stale'?'Record fresh check-in':'Record a follow-up'}</button>`:''}</div>`;
     return `<article class="action-card${priority}"><h3>${action.title}</h3>${body}${buttons}</article>`;
   }).join(''):'<p class="empty-state">No follow-up actions from the latest check-in. Fictional sample ranges do not establish health or rule out illness.</p>';
 }
@@ -64,29 +86,33 @@ function render(){
   $('#summary').innerHTML=`<b>${result.title}</b>${result.stale?'<p>Last check-in is over 24 hours old. This snapshot is stale.</p>':''}${latest?.symptoms?'<p>Do not wait for app feedback or a connection. Use the established onboard medical response procedure and notify the designated medical officer.</p>':''}${result.flags.length?'<ul>'+result.flags.map(f=>`<li>${f.message}</li>`).join('')+'</ul><p>Verify the entry and measurement context; review with the designated medical officer under mission procedures. These flags do not diagnose a condition.</p>':latest?'<p>No fictional demo range flags. This does not establish health or rule out illness.</p>':'<p>Enter measurements or load the synthetic demo to explore the console.</p>'}`;
   $('#metrics').innerHTML=Object.entries(METRICS).map(([key,m])=>{const flag=result.flags.some(f=>f.key===key);return `<div class="metric-card"><div class="label">${m.label}</div><div class="metric-value">${latest?latest[key]:'—'}<small>${m.unit}</small></div><div class="metric-status ${!latest?'empty':flag?'flag':''}">${!latest?'AWAITING MEASUREMENT':flag?'△ UNHEALTHY RANGE':'• HEALTHY RANGE'}</div></div>`;}).join('');
   $('#record-count').textContent=`${records.length} CHECK-INS`;
-  $('#history').innerHTML=records.length?table(records.slice(-30).reverse(),Object.keys(METRICS))+'<p class="muted">Showing latest 30 records. Exports include all records and notes.</p>':'<p class="empty-state">No check-ins saved yet.</p>';
+  $('#history').innerHTML=records.length?historyTable(records.slice(-30).reverse())+'<p class="muted">Showing latest 30 records. Exports include all records, notes, and follow-up links.</p>':'<p class="empty-state">No check-ins saved yet.</p>';
   $('#export-json').disabled=$('#export-csv').disabled=!records.length;
   renderActions(latest);
   renderChart();
 }
 $('#chart-metric').addEventListener('change',renderChart);
+function beginFollowUp(type,key,sourceId){pendingFollowUp={followUpTo:sourceId,followUpIndicator:key||null,followUpReason:type==='flag'?'unhealthy-range':type};renderFollowUpContext();$('#measurement-time').value=localInputTime();$('#checkin').scrollIntoView({behavior:'smooth'});(pendingFollowUp.followUpIndicator?document.querySelector(`[name="${pendingFollowUp.followUpIndicator}"]`):type==='symptoms'?$('#checkin-form [name="symptoms"]'):$('#measurement-time')).focus();}
 $('#action-guidance').addEventListener('click',e=>{
   const trend=e.target.closest('[data-trend]');
   if(trend){$('#chart-metric').value=trend.dataset.trend;renderChart();$('#trends').scrollIntoView({behavior:'smooth'});$('#chart-metric').focus();return;}
   const followUp=e.target.closest('[data-follow-up]');
-  if(followUp){$('#measurement-time').value=localInputTime();$('#checkin').scrollIntoView({behavior:'smooth'});(followUp.dataset.followUp==='symptoms'?$('#checkin-form [name="symptoms"]'):$('#measurement-time')).focus();}
+  if(followUp)beginFollowUp(followUp.dataset.followUp,followUp.dataset.followUpKey,followUp.dataset.sourceId);
 });
+$('#history').addEventListener('click',event=>{const button=event.target.closest('[data-history-follow-up]');if(button)beginFollowUp(button.dataset.historyFollowUp,button.dataset.followUpKey,button.dataset.sourceId);});
+$('#cancel-follow-up').addEventListener('click',()=>{pendingFollowUp=null;renderFollowUpContext();});
 $('#checkin-form').addEventListener('submit',e=>{
   e.preventDefault(); const data=new FormData(e.target);
   try{
     if(records.length>=500)throw new Error('500-check-in demo limit reached. Export and clear records to start a new dataset.');
-    const input={date:new Date(data.get('date')).toISOString(),symptoms:data.has('symptoms'),notes:String(data.get('notes')||'')};
+    const input={id:createRecordId(),date:new Date(data.get('date')).toISOString(),symptoms:data.has('symptoms'),notes:String(data.get('notes')||''),...(pendingFollowUp||{})};
     for(const key of Object.keys(METRICS))input[key]=Number(data.get(key));
     const record=validateRecord(input);
     if(records.some(r=>r.date===record.date))throw new Error('A check-in already exists at this time. Choose another measurement time.');
+    if(record.followUpTo){const source=records.find(r=>r.id===record.followUpTo);if(!source||source.date>=record.date)throw new Error('Choose a follow-up time later than the source check-in.');}
     const next=[...records,record].sort((a,b)=>a.date.localeCompare(b.date));
     if(!persist(next))throw new Error('Check-in not saved. Browser storage is unavailable or full.');
-    e.target.reset();$('#measurement-time').value=localInputTime();render();
+    e.target.reset();pendingFollowUp=null;renderFollowUpContext();$('#measurement-time').value=localInputTime();render();
     $('#form-message').textContent='Check-in saved on this device.';
   }catch(err){$('#form-message').textContent=err.message;}
 });
@@ -105,7 +131,7 @@ const navTargets=navLinks.map(link=>({link,section:document.querySelector(link.g
 function updateActiveNavigation(){const marker=innerHeight*.35;const passed=navTargets.filter(item=>item.section.getBoundingClientRect().top<=marker).sort((a,b)=>a.section.getBoundingClientRect().top-b.section.getBoundingClientRect().top);const active=(passed.at(-1)||navTargets[0])?.link;navLinks.forEach(link=>{const selected=link===active;link.classList.toggle('active',selected);if(selected)link.setAttribute('aria-current','location');else link.removeAttribute('aria-current');});}
 addEventListener('scroll',updateActiveNavigation,{passive:true});addEventListener('resize',updateActiveNavigation);updateActiveNavigation();
 function download(content,name,type){const url=URL.createObjectURL(new Blob([content],{type}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
-$('#export-json').addEventListener('click',()=>download(JSON.stringify({version:1,exportedAt:new Date().toISOString(),records},null,2),'orbit-health-records.json','application/json'));
+$('#export-json').addEventListener('click',()=>download(JSON.stringify({version:DATA_VERSION,exportedAt:new Date().toISOString(),records},null,2),'orbit-health-records.json','application/json'));
 $('#export-csv').addEventListener('click',()=>download(csv(records),'orbit-health-records.csv','text/csv'));
 $('#load-demo').addEventListener('click',()=>{if(records.length&&!confirm('Replace existing check-ins with 14 fictional demo records? Export first if you want to keep them.'))return;if(persist(demoRecords())){$('#data-message').textContent='Loaded 14 fictional check-ins. No real astronaut data is used.';render();}});
 $('#import').addEventListener('change',async e=>{
@@ -116,7 +142,7 @@ $('#import').addEventListener('change',async e=>{
 });
 $('#clear').addEventListener('click',()=>{
   if(!confirm('Permanently clear all Orbit Health check-ins and routine progress on this browser?'))return;
-  try{localStorage.removeItem(KEY);localStorage.removeItem(ROUTINE_KEY);records=[];checked=[];storageAvailable=true;updateConnection();render();renderRoutine();$('#data-message').textContent='Local records and routine progress cleared.';}
+  try{localStorage.removeItem(KEY);localStorage.removeItem(ROUTINE_KEY);records=[];checked=[];pendingFollowUp=null;storageAvailable=true;updateConnection();renderFollowUpContext();render();renderRoutine();$('#data-message').textContent='Local records and routine progress cleared.';}
   catch{$('#data-message').textContent='Could not clear local data. Use your browser’s site data controls.';}
 });
 window.addEventListener('online',updateConnection);window.addEventListener('offline',updateConnection);

@@ -53,11 +53,15 @@ export const MEASUREMENT_GUIDES = {
   }
 };
 export const ROUTINES = ['Record daily check-in', 'Review assigned exercise plan', 'Review food and fluid log', 'Complete private wellbeing reflection'];
+const FOLLOW_UP_REASONS = new Set(['unhealthy-range', 'symptoms', 'stale']);
+const derivedRecordId = date => `record-${date.getTime().toString(36)}`;
 export function validateRecord(input, now = new Date()) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Invalid check-in.');
   const date = new Date(input.date);
   if (typeof input.date !== 'string' || !Number.isFinite(+date) || +date > +now + 60000) throw new Error('Choose a valid date and time that is not in the future.');
-  const record = {date: date.toISOString()};
+  const id = input.id ?? derivedRecordId(date);
+  if (typeof id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(id)) throw new Error('Record ID is invalid.');
+  const record = {id, date: date.toISOString()};
   for (const [key, metric] of Object.entries(METRICS)) {
     const value = input[key];
     if (typeof value !== 'number' || !Number.isFinite(value) || value < metric.min || value > metric.max || (metric.step === 1 && !Number.isInteger(value))) throw new Error(`${metric.label}: enter a valid value from ${metric.min} to ${metric.max}.`);
@@ -67,12 +71,31 @@ export function validateRecord(input, now = new Date()) {
   if (typeof input.notes !== 'string' || input.notes.length > 500) throw new Error('Notes must be text of at most 500 characters.');
   record.symptoms = input.symptoms;
   record.notes = input.notes;
+  const hasFollowUp = input.followUpTo != null || input.followUpIndicator != null || input.followUpReason != null;
+  if (hasFollowUp) {
+    if (typeof input.followUpTo !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(input.followUpTo) || input.followUpTo === id) throw new Error('Follow-up source is invalid.');
+    if (input.followUpIndicator != null && !Object.hasOwn(METRICS, input.followUpIndicator)) throw new Error('Follow-up indicator is invalid.');
+    if (!FOLLOW_UP_REASONS.has(input.followUpReason)) throw new Error('Follow-up reason is invalid.');
+    if (input.followUpReason === 'unhealthy-range' && !input.followUpIndicator) throw new Error('Indicator follow-ups must identify an indicator.');
+    if (input.followUpReason !== 'unhealthy-range' && input.followUpIndicator != null) throw new Error('Only unhealthy-range follow-ups can identify an indicator.');
+    record.followUpTo = input.followUpTo;
+    record.followUpIndicator = input.followUpIndicator ?? null;
+    record.followUpReason = input.followUpReason;
+  }
   return record;
 }
 export function parseImport(data, now = new Date()) {
-  if (data?.version !== 1 || !Array.isArray(data.records) || data.records.length > 500) throw new Error('Expected an Orbit Health version 1 export with at most 500 check-ins.');
+  if (![1,2].includes(data?.version) || !Array.isArray(data.records) || data.records.length > 500) throw new Error('Expected an Orbit Health version 1 or 2 export with at most 500 check-ins.');
   const records = data.records.map(r => validateRecord(r, now));
   if (new Set(records.map(r => r.date)).size !== records.length) throw new Error('Duplicate check-in timestamps in file.');
+  if (new Set(records.map(r => r.id)).size !== records.length) throw new Error('Duplicate record IDs in file.');
+  const byId = new Map(records.map(record => [record.id, record]));
+  for (const record of records) {
+    if (!record.followUpTo) continue;
+    const source = byId.get(record.followUpTo);
+    if (!source) throw new Error('Follow-up source record is missing.');
+    if (source.date >= record.date) throw new Error('A follow-up must be later than its source record.');
+  }
   return records.sort((a,b) => a.date.localeCompare(b.date));
 }
 export function assess(record, now = new Date()) {
@@ -88,11 +111,11 @@ export function unhealthyTrendPoints(records, key) {
   return values.map(value => Number.isFinite(value) && (value < metric.envelope[0] || value > metric.envelope[1]));
 }
 export function demoRecords(now = new Date()) {
-  return Array.from({length:14}, (_,i) => ({date:new Date(+now - (13-i)*86400000).toISOString(),heartRate:[66,68,65,70,67,69,72,68,71,74,72,76,78,82][i],systolic:115 + i % 6,temperature:Number((36.6 + (i % 3)/10).toFixed(1)),glucose:92 + i%9,sleep:[8,7.7,8.2,7.5,7.8,7.4,7.6,7.2,7.1,7.5,7,6.8,6.5,6.2][i],oxygenSaturation:Number((98 - (i % 4)/10).toFixed(1)),radiationExposure:Number((0.08 + i * 0.004).toFixed(3)),symptoms:false,notes:i===13?'Synthetic example: interrupted sleep after a busy mission day.':'Synthetic demo record.'}));
+  return Array.from({length:14}, (_,i) => ({id:`demo-${String(i+1).padStart(2,'0')}`,date:new Date(+now - (13-i)*86400000).toISOString(),heartRate:[66,68,65,70,67,69,72,68,71,74,72,76,78,82][i],systolic:115 + i % 6,temperature:Number((36.6 + (i % 3)/10).toFixed(1)),glucose:92 + i%9,sleep:[8,7.7,8.2,7.5,7.8,7.4,7.6,7.2,7.1,7.5,7,6.8,6.5,6.2][i],oxygenSaturation:Number((98 - (i % 4)/10).toFixed(1)),radiationExposure:Number((0.08 + i * 0.004).toFixed(3)),symptoms:false,notes:i===13?'Synthetic example: interrupted sleep after a busy mission day.':'Synthetic demo record.'}));
 }
 export function csv(records) {
-  const keys = ['date',...Object.keys(METRICS),'symptoms','notes'];
+  const keys = ['id','date',...Object.keys(METRICS),'symptoms','notes','followUpTo','followUpIndicator','followUpReason'];
   // Neutralize spreadsheet formulas even when a cell begins with whitespace.
   const cell = v => '"' + String(typeof v === 'string' && /^[\s]*[=+@\-]/.test(v) ? "'"+v : v).replaceAll('"','""') + '"';
-  return [keys.join(','),...records.map(r => keys.map(k=>cell(r[k])).join(','))].join('\r\n');
+  return [keys.join(','),...records.map(r => keys.map(k=>cell(r[k] ?? '')).join(','))].join('\r\n');
 }
